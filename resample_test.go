@@ -1,4 +1,4 @@
-package pkg
+package resample
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -11,7 +11,7 @@ func TestResampler(t *testing.T) {
 	or := 16000.0
 	ch := 1
 	frmt := I16
-	quality := -1
+	quality := Linear
 	output := io.Discard
 
 	_, err := New(output, ir, or, ch, frmt, quality)
