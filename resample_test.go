@@ -14,7 +14,11 @@ func TestResampler(t *testing.T) {
 	quality := Linear
 	output := io.Discard
 
-	_, err := New(output, ir, or, ch, frmt, quality)
+	res, err := New(output, ir, or, ch, frmt, quality)
 	assert.NoError(t, err)
+
+	data := []int16{1}
+	_, err = res.Write(data)
+	assert.Error(t, err)
 
 }
