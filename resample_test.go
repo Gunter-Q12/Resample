@@ -12,6 +12,17 @@ func TestResampler(t *testing.T) {
 	ch := 1
 	quality := Linear
 
-	_, err := ResampleInt16(input, ir, or, ch, quality)
-	assert.NoError(t, err)
+	t.Run("New", func(t *testing.T) {
+		_, err := ResampleInt16(input, ir, or, ch, quality)
+		assert.NoError(t, err)
+	})
+	t.Run("in=out", func(t *testing.T) {
+		output, err := ResampleInt16(input, 1, 1, ch, quality)
+		assert.NoError(t, err)
+		assert.Equal(t, input, output)
+	})
+	t.Run("not enough samples", func(t *testing.T) {
+		_, err := ResampleInt16([]int16{1}, ir, or, ch, quality)
+		assert.Error(t, err)
+	})
 }
