@@ -25,9 +25,16 @@ func TestResampler(t *testing.T) {
 		_, err := Int16([]int16{1}, ir, or, ch, quality)
 		assert.Error(t, err)
 	})
-	t.Run("simplest case", func(t *testing.T) {
+	t.Run("simplest upsampling case", func(t *testing.T) {
 		want := []int16{1, 2, 3, 4, 5}
-		got, err := Int16([]int16{1, 3, 5}, ir, or, ch, quality)
+		got, err := Int16([]int16{1, 3, 5}, 1, 2, ch, quality)
+
+		assert.NoError(t, err)
+		assert.Equal(t, want, got)
+	})
+	t.Run("simplest downsampling case", func(t *testing.T) {
+		want := []int16{1, 3, 5}
+		got, err := Int16([]int16{1, 2, 3, 4, 5}, 2, 1, ch, quality)
 
 		assert.NoError(t, err)
 		assert.Equal(t, want, got)
