@@ -11,15 +11,15 @@ const (
 	Linear Quality = iota // Linear interpolation
 )
 
-func ResampleInt16(input []int16, inRate, outRate, ch int, quality Quality) ([]int16, error) {
+func Int16(input []int16, inRate, outRate, ch int, quality Quality) ([]int16, error) {
 	if inRate == outRate {
 		return input, nil
 	}
 	if len(input) < 2 {
 		return []int16{}, errors.New("input should have at least two samples")
 	}
-	outputSize := int((len(input)-1)*outRate/inRate) + 1
 
+	outputSize := int((len(input)-1)*outRate/inRate) + 1
 	output := make([]int16, outputSize)
 	output[0] = input[0]
 
