@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"io"
 	"testing"
 )
 
@@ -57,4 +58,17 @@ func TestResampler(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("io.Copy", func(t *testing.T) {
+		inBuf := new(bytes.Buffer)
+		err := binary.Write(inBuf, binary.LittleEndian, []int16{1, 3, 5})
+		assert.NoError(t, err)
+
+		outBuf := new(bytes.Buffer)
+		res := New(outBuf, 1, 2, ch, format, quality)
+
+		size, err := io.Copy(res, inBuf)
+		assert.NoError(t, err)
+		assert.EqualValues(t, 6, size)
+	})
 }
