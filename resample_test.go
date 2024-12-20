@@ -1,42 +1,45 @@
 package resample
 
 import (
+	"errors"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestResampler(t *testing.T) {
-	input := []int16{1, 2, 3}
-	ir := 8000
-	or := 16000
 	ch := 1
 	quality := Linear
 
-	t.Run("New", func(t *testing.T) {
-		_, err := Int16(input, ir, or, ch, quality)
-		assert.NoError(t, err)
-	})
-	t.Run("in=out", func(t *testing.T) {
-		output, err := Int16(input, 1, 1, ch, quality)
-		assert.NoError(t, err)
-		assert.Equal(t, input, output)
-	})
-	t.Run("not enough samples", func(t *testing.T) {
-		_, err := Int16([]int16{1}, ir, or, ch, quality)
-		assert.Error(t, err)
-	})
-	t.Run("simplest upsampling case", func(t *testing.T) {
-		want := []int16{1, 2, 3, 4, 5}
-		got, err := Int16([]int16{1, 3, 5}, 1, 2, ch, quality)
-
-		assert.NoError(t, err)
-		assert.Equal(t, want, got)
-	})
-	t.Run("simplest downsampling case", func(t *testing.T) {
-		want := []int16{1, 3, 5}
-		got, err := Int16([]int16{1, 2, 3, 4, 5}, 2, 1, ch, quality)
-
-		assert.NoError(t, err)
-		assert.Equal(t, want, got)
-	})
+	resamplerTest := []struct {
+		name   string
+		input  []int16
+		output []int16
+		err    error
+		ir     int
+		or     int
+	}{
+		{name: "in=out",
+			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
+			err: nil, ir: 1, or: 1},
+		{name: "in=out",
+			input: []int16{1},
+			err:   errors.New(""), ir: 1, or: 2},
+		{name: "simplest upsampling case",
+			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
+			err: nil, ir: 1, or: 2},
+		{name: "simplest downsampling case",
+			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3, 5},
+			err: nil, ir: 2, or: 1},
+	}
+	for _, tt := range resamplerTest {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := Int16(tt.input, tt.ir, tt.or, ch, quality)
+			if tt.err != nil {
+				assert.Error(t, err)
+			}
+			if tt.err == nil {
+				assert.Equal(t, tt.output, output)
+			}
+		})
+	}
 }
