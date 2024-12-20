@@ -1,6 +1,8 @@
 package resample
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -8,6 +10,7 @@ import (
 
 func TestResampler(t *testing.T) {
 	ch := 1
+	format := I16
 	quality := Linear
 
 	resamplerTest := []struct {
@@ -21,7 +24,7 @@ func TestResampler(t *testing.T) {
 		{name: "in=out",
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
 			err: nil, ir: 1, or: 1},
-		{name: "in=out",
+		{name: "not enough samples",
 			input: []int16{1},
 			err:   errors.New(""), ir: 1, or: 2},
 		{name: "simplest upsampling case",
@@ -33,11 +36,23 @@ func TestResampler(t *testing.T) {
 	}
 	for _, tt := range resamplerTest {
 		t.Run(tt.name, func(t *testing.T) {
-			output, err := Int16(tt.input, tt.ir, tt.or, ch, quality)
+			outBuf := new(bytes.Buffer)
+
+			inBuf := new(bytes.Buffer)
+			err := binary.Write(inBuf, binary.LittleEndian, tt.input)
+			assert.NoError(t, err)
+
+			res := New(outBuf, tt.ir, tt.or, ch, format, quality)
+
+			_, err = res.Write(inBuf.Bytes())
 			if tt.err != nil {
 				assert.Error(t, err)
 			}
 			if tt.err == nil {
+				output := make([]int16, len(tt.output))
+				err := binary.Read(outBuf, binary.LittleEndian, output)
+
+				assert.NoError(t, err)
 				assert.Equal(t, tt.output, output)
 			}
 		})
