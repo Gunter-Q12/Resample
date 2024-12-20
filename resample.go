@@ -91,5 +91,5 @@ func (r *Resampler) Write(input []byte) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
-	return outputSize, nil
+	return len(input), nil
 }
