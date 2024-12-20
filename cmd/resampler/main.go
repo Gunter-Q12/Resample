@@ -1,8 +1,8 @@
 package main
 
 import (
-	"encoding/binary"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -61,19 +61,12 @@ func main() {
 		inputSize -= wavHeader
 	}
 
-	// Read input and pass it to the Resampler in chunks
-	int16Slice := make([]int16, inputSize/2)
-	err = binary.Read(input, binary.LittleEndian, &int16Slice)
-	if err != nil {
-		log.Printf("convert input to int16: %s", err)
-	}
-
-	outputData, err := resample.Int16(int16Slice, *ir, *or, *ch, resample.Quality(*q))
-	err = binary.Write(output, binary.LittleEndian, outputData)
+	res := resample.New(output, *ir, *or, *ch, resample.I16, resample.Quality(*q))
+	_, err = io.Copy(res, input)
 	output.Close()
 
 	if err != nil {
 		os.Remove(outputFile)
-		log.Fatalln(err)
+		log.Fatalf("failed resampling: %s", err)
 	}
 }
