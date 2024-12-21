@@ -72,3 +72,14 @@ func TestResampler(t *testing.T) {
 		assert.EqualValues(t, 6, size)
 	})
 }
+
+func FuzzResampler(f *testing.F) {
+	f.Fuzz(func(t *testing.T, samples []byte, ir, or int) {
+		if len(samples)%2 == 0 {
+			return
+		}
+
+		res := New(io.Discard, ir, or, 1, I16, Linear)
+		_, _ = res.Write(samples)
+	})
+}
