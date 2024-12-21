@@ -77,7 +77,7 @@ func TestResampler(t *testing.T) {
 
 func FuzzResampler(f *testing.F) {
 	f.Fuzz(func(t *testing.T, samples []byte, ir, or int) {
-		if len(samples)%2 == 0 {
+		if len(samples)%2 != 0 {
 			return
 		}
 
