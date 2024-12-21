@@ -61,7 +61,10 @@ func main() {
 		inputSize -= wavHeader
 	}
 
-	res := resample.New(output, *ir, *or, *ch, resample.I16, resample.Quality(*q))
+	res, err := resample.New(output, *ir, *or, *ch, resample.I16, resample.Quality(*q))
+	if err != nil {
+		log.Fatalln(err)
+	}
 	_, err = io.Copy(res, input)
 	output.Close()
 

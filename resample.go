@@ -30,7 +30,10 @@ type Resampler struct {
 	quality Quality
 }
 
-func New(outBuffer io.Writer, inRate, outRate, ch int, format Format, quality Quality) *Resampler {
+func New(outBuffer io.Writer, inRate, outRate, ch int, format Format, quality Quality) (*Resampler, error) {
+	if inRate <= 0 || outRate <= 0 {
+		return nil, errors.New("sampling rates must be greater than zero")
+	}
 	return &Resampler{
 		outBuf:  outBuffer,
 		inRate:  inRate,
@@ -38,7 +41,7 @@ func New(outBuffer io.Writer, inRate, outRate, ch int, format Format, quality Qu
 		ch:      ch,
 		format:  format,
 		quality: quality,
-	}
+	}, nil
 }
 
 func (r *Resampler) Write(input []byte) (int, error) {

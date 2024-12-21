@@ -43,7 +43,8 @@ func TestResampler(t *testing.T) {
 			err := binary.Write(inBuf, binary.LittleEndian, tt.input)
 			assert.NoError(t, err)
 
-			res := New(outBuf, tt.ir, tt.or, ch, format, quality)
+			res, err := New(outBuf, tt.ir, tt.or, ch, format, quality)
+			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
 			if tt.err != nil {
@@ -65,7 +66,8 @@ func TestResampler(t *testing.T) {
 		assert.NoError(t, err)
 
 		outBuf := new(bytes.Buffer)
-		res := New(outBuf, 1, 2, ch, format, quality)
+		res, err := New(outBuf, 1, 2, ch, format, quality)
+		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)
 		assert.NoError(t, err)
@@ -79,7 +81,10 @@ func FuzzResampler(f *testing.F) {
 			return
 		}
 
-		res := New(io.Discard, ir, or, 1, I16, Linear)
+		res, err := New(io.Discard, ir, or, 1, I16, Linear)
+		if err != nil {
+			return
+		}
 		_, _ = res.Write(samples)
 	})
 }
