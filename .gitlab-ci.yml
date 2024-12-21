@@ -1,0 +1,19 @@
+image: golang:1.23-alpine
+
+stages:
+  - test
+
+test:
+  stage: test
+  script:
+    - go test ./... -coverprofile=coverage-report.out
+    - go tool cover -html=coverage-report.out -o coverage-report.html
+    - go tool cover -func=coverage-report.out
+  artifacts:
+    paths:
+      - coverage-report.html
+    expire_in: 1 hour
+  coverage: "/\\(statements\\)\\s+\\d+.?\\d+%/"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
