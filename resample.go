@@ -71,22 +71,22 @@ func (r *Resampler) Write(input []byte) (int, error) {
 	var x float64
 	for i := 1; i < outputSize; i++ {
 		x += float64(r.inRate) / float64(r.outRate)
-		x0 := math.Floor(x)
-		x1 := math.Ceil(x)
-
-		x0Dist := x - x0
-		x1Dist := x1 - x
-
-		y0 := float64(samples[int(x0)])
-		y1 := float64(samples[int(x1)])
 
 		var newSample int16
-		if math.Abs(x1-x0) < 1e-6 { // Why this epsilon?
-			newSample = samples[int(x0)]
+		if math.Abs(x-math.Round(x)) < 1e-6 { // Why this epsilon?
+			newSample = samples[int(math.Round(x))]
 		} else {
+			x0 := math.Floor(x)
+			x1 := math.Ceil(x)
+
+			x0Dist := x - x0
+			x1Dist := x1 - x
+
+			y0 := float64(samples[int(x0)])
+			y1 := float64(samples[int(x1)])
+
 			newSample = int16(y0*x1Dist + y1*x0Dist)
 		}
-
 		output[i] = newSample
 	}
 
