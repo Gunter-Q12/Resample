@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"io"
+	"os"
 	"testing"
 )
 
@@ -75,6 +76,22 @@ func TestResampler(t *testing.T) {
 	})
 }
 
+func TestGetSincWindow(t *testing.T) {
+	raw, err := os.ReadFile("./testdata/sinc_window")
+	assert.NoError(t, err)
+
+	want := make([]float64, len(raw)/8)
+	err = binary.Read(bytes.NewReader(raw), binary.LittleEndian, &want)
+	assert.NoError(t, err)
+
+	got, err := getSincWindow(64, 9, 0.945)
+	//toFile(got, "testdata/sinc_window_go")
+	assert.NoError(t, err)
+	assert.Lenf(t, got, len(want), "want: %d, got: %d", len(want), len(got))
+	assert.InDeltaSlice(t, want, got, 0.0001)
+
+}
+
 func FuzzResampler(f *testing.F) {
 	f.Fuzz(func(t *testing.T, samples []byte, ir, or int) {
 		if len(samples)%2 != 0 {
@@ -87,4 +104,17 @@ func FuzzResampler(f *testing.F) {
 		}
 		_, _ = res.Write(samples)
 	})
+}
+
+func toFile(values any, path string) {
+	file, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	err = binary.Write(file, binary.LittleEndian, values)
+	if err != nil {
+		panic(err)
+	}
 }
