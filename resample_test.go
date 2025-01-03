@@ -13,7 +13,6 @@ import (
 func TestResampler(t *testing.T) {
 	ch := 1
 	format := I16
-	quality := Linear
 
 	resamplerTest := []struct {
 		name   string
@@ -22,19 +21,23 @@ func TestResampler(t *testing.T) {
 		err    error
 		ir     int
 		or     int
+		q      Quality
 	}{
 		{name: "in=out",
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
-			err: nil, ir: 1, or: 1},
+			err: nil, ir: 1, or: 1, q: Linear},
 		{name: "not enough samples",
 			input: []int16{1},
-			err:   errors.New(""), ir: 1, or: 2},
+			err:   errors.New(""), ir: 1, or: 2, q: Linear},
 		{name: "simplest upsampling case",
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
-			err: nil, ir: 1, or: 2},
+			err: nil, ir: 1, or: 2, q: Linear},
 		{name: "simplest downsampling case",
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3, 5},
-			err: nil, ir: 2, or: 1},
+			err: nil, ir: 2, or: 1, q: Linear},
+		{name: "kaiser_fast",
+			input: []int16{1, 2, 3, 4, 5},
+			err:   errors.New(""), ir: 2, or: 1, q: KaiserFast},
 	}
 	for _, tt := range resamplerTest {
 		t.Run(tt.name, func(t *testing.T) {
@@ -44,7 +47,7 @@ func TestResampler(t *testing.T) {
 			err := binary.Write(inBuf, binary.LittleEndian, tt.input)
 			assert.NoError(t, err)
 
-			res, err := New(outBuf, tt.ir, tt.or, ch, format, quality)
+			res, err := New(outBuf, tt.ir, tt.or, ch, format, tt.q)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -67,7 +70,7 @@ func TestResampler(t *testing.T) {
 		assert.NoError(t, err)
 
 		outBuf := new(bytes.Buffer)
-		res, err := New(outBuf, 1, 2, ch, format, quality)
+		res, err := New(outBuf, 1, 2, ch, format, Linear)
 		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)

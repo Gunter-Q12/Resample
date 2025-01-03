@@ -13,6 +13,7 @@ type Quality int
 
 const (
 	Linear Quality = iota // Linear interpolation
+	KaiserFast
 )
 
 type Format int
@@ -59,6 +60,17 @@ func (r *Resampler) Write(input []byte) (int, error) {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
 
+	switch r.quality {
+	case Linear:
+		return r.linear(samples)
+	case KaiserFast:
+		return r.kaiserFast(samples)
+	default:
+		return 0, fmt.Errorf("unknown quality: %d", r.quality)
+	}
+}
+
+func (r *Resampler) linear(samples []int16) (int, error) {
 	if len(samples) < 2 {
 		return 0, errors.New("input should have at least two samples")
 	}
@@ -90,11 +102,15 @@ func (r *Resampler) Write(input []byte) (int, error) {
 		output[i] = newSample
 	}
 
-	err = binary.Write(r.outBuf, binary.LittleEndian, output)
+	err := binary.Write(r.outBuf, binary.LittleEndian, output)
 	if err != nil {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
-	return len(input), nil
+	return len(samples) * 2, nil
+}
+
+func (r *Resampler) kaiserFast(samples []int16) (int, error) {
+	return 0, errors.New("kaiser fast not implemented")
 }
 
 func getSincWindow(zeros, precision int, rolloff float64) ([]float64, error) {
