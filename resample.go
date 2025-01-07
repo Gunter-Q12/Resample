@@ -60,19 +60,29 @@ func (r *Resampler) Write(input []byte) (int, error) {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
 
+	var output []int16
 	switch r.quality {
 	case Linear:
-		return r.linear(samples)
+		output, err = r.linear(samples)
 	case KaiserFast:
-		return r.kaiserFast(samples)
+		output, err = r.kaiserFast(samples)
 	default:
 		return 0, fmt.Errorf("unknown quality: %d", r.quality)
 	}
+	if err != nil {
+		return 0, err
+	}
+
+	err = binary.Write(r.outBuf, binary.LittleEndian, output)
+	if err != nil {
+		return 0, fmt.Errorf("resampler write: %w", err)
+	}
+	return len(input), nil
 }
 
-func (r *Resampler) linear(samples []int16) (int, error) {
+func (r *Resampler) linear(samples []int16) ([]int16, error) {
 	if len(samples) < 2 {
-		return 0, errors.New("input should have at least two samples")
+		return nil, errors.New("input should have at least two samples")
 	}
 
 	outputSize := int((len(samples)-1)*r.outRate/r.inRate) + 1
@@ -102,15 +112,11 @@ func (r *Resampler) linear(samples []int16) (int, error) {
 		output[i] = newSample
 	}
 
-	err := binary.Write(r.outBuf, binary.LittleEndian, output)
-	if err != nil {
-		return 0, fmt.Errorf("resampler write: %w", err)
-	}
-	return len(samples) * 2, nil
+	return output, nil
 }
 
-func (r *Resampler) kaiserFast(samples []int16) (int, error) {
-	return 0, errors.New("kaiser fast not implemented")
+func (r *Resampler) kaiserFast(samples []int16) ([]int16, error) {
+	return nil, errors.New("kaiser fast not implemented")
 }
 
 func getSincWindow(zeros, precision int, rolloff float64) ([]float64, error) {
