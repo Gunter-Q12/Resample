@@ -5,9 +5,15 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"golang.org/x/exp/constraints"
 	"io"
 	"math"
+	"reflect"
 )
+
+type Number interface {
+	constraints.Float | constraints.Integer
+}
 
 type Quality int
 
@@ -16,51 +22,42 @@ const (
 	KaiserFast
 )
 
-type Format int
-
-const (
-	I16 Format = iota
-)
-
-type Resampler struct {
+type Resampler[T Number] struct {
 	outBuf  io.Writer
 	inRate  int
 	outRate int
 	ch      int
-	format  Format
 	quality Quality
 }
 
-func New(outBuffer io.Writer, inRate, outRate, ch int, format Format, quality Quality) (*Resampler, error) {
+func New[T Number](outBuffer io.Writer, inRate, outRate, ch int, quality Quality) (*Resampler[T], error) {
 	if inRate <= 0 || outRate <= 0 {
 		return nil, errors.New("sampling rates must be greater than zero")
 	}
-	return &Resampler{
+	return &Resampler[T]{
 		outBuf:  outBuffer,
 		inRate:  inRate,
 		outRate: outRate,
 		ch:      ch,
-		format:  format,
 		quality: quality,
 	}, nil
 }
 
-func (r *Resampler) Write(input []byte) (int, error) {
+func (r *Resampler[T]) Write(input []byte) (int, error) {
 	if r.inRate == r.outRate {
 		return r.outBuf.Write(input)
 	}
 
-	if r.format != I16 {
-		return 0, errors.New("the only supported format is I16")
-	}
+	var t T
+	elemLen := int(reflect.TypeOf(t).Size())
 
-	samples := make([]int16, len(input)/2)
+	samples := make([]T, len(input)/elemLen)
 	err := binary.Read(bytes.NewReader(input), binary.LittleEndian, &samples)
 	if err != nil {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
 
-	var output []int16
+	var output []T
 	switch r.quality {
 	case Linear:
 		output, err = r.linear(samples)
@@ -80,13 +77,13 @@ func (r *Resampler) Write(input []byte) (int, error) {
 	return len(input), nil
 }
 
-func (r *Resampler) linear(samples []int16) ([]int16, error) {
+func (r *Resampler[T]) linear(samples []T) ([]T, error) {
 	if len(samples) < 2 {
 		return nil, errors.New("input should have at least two samples")
 	}
 
 	outputSize := int((len(samples)-1)*r.outRate/r.inRate) + 1
-	output := make([]int16, outputSize)
+	output := make([]T, outputSize)
 
 	output[0] = samples[0]
 
@@ -94,7 +91,7 @@ func (r *Resampler) linear(samples []int16) ([]int16, error) {
 	for i := 1; i < outputSize; i++ {
 		x += float64(r.inRate) / float64(r.outRate)
 
-		var newSample int16
+		var newSample T
 		if math.Abs(x-math.Round(x)) < 1e-6 { // Why this epsilon?
 			newSample = samples[int(math.Round(x))]
 		} else {
@@ -107,7 +104,7 @@ func (r *Resampler) linear(samples []int16) ([]int16, error) {
 			y0 := float64(samples[int(x0)])
 			y1 := float64(samples[int(x1)])
 
-			newSample = int16(y0*x1Dist + y1*x0Dist)
+			newSample = T(y0*x1Dist + y1*x0Dist)
 		}
 		output[i] = newSample
 	}
@@ -115,7 +112,7 @@ func (r *Resampler) linear(samples []int16) ([]int16, error) {
 	return output, nil
 }
 
-func (r *Resampler) kaiserFast(samples []int16) ([]int16, error) {
+func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
 	return nil, errors.New("kaiser fast not implemented")
 }
 

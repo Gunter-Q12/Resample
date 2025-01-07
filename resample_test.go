@@ -12,7 +12,6 @@ import (
 
 func TestResampler(t *testing.T) {
 	ch := 1
-	format := I16
 
 	resamplerTest := []struct {
 		name   string
@@ -47,7 +46,7 @@ func TestResampler(t *testing.T) {
 			err := binary.Write(inBuf, binary.LittleEndian, tt.input)
 			assert.NoError(t, err)
 
-			res, err := New(outBuf, tt.ir, tt.or, ch, format, tt.q)
+			res, err := New[int16](outBuf, tt.ir, tt.or, ch, tt.q)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -70,7 +69,7 @@ func TestResampler(t *testing.T) {
 		assert.NoError(t, err)
 
 		outBuf := new(bytes.Buffer)
-		res, err := New(outBuf, 1, 2, ch, format, Linear)
+		res, err := New[int16](outBuf, 1, 2, ch, Linear)
 		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)
@@ -101,7 +100,7 @@ func FuzzResampler(f *testing.F) {
 			return
 		}
 
-		res, err := New(io.Discard, ir, or, 1, I16, Linear)
+		res, err := New[int16](io.Discard, ir, or, 1, Linear)
 		if err != nil {
 			return
 		}
