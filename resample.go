@@ -23,23 +23,29 @@ const (
 )
 
 type Resampler[T Number] struct {
-	outBuf  io.Writer
-	inRate  int
-	outRate int
-	ch      int
-	quality Quality
+	outBuf   io.Writer
+	inRate   int
+	outRate  int
+	ch       int
+	quality  Quality
+	elemSize int
 }
 
 func New[T Number](outBuffer io.Writer, inRate, outRate, ch int, quality Quality) (*Resampler[T], error) {
 	if inRate <= 0 || outRate <= 0 {
 		return nil, errors.New("sampling rates must be greater than zero")
 	}
+
+	var t T
+	elemSize := int(reflect.TypeOf(t).Size())
+
 	return &Resampler[T]{
-		outBuf:  outBuffer,
-		inRate:  inRate,
-		outRate: outRate,
-		ch:      ch,
-		quality: quality,
+		outBuf:   outBuffer,
+		inRate:   inRate,
+		outRate:  outRate,
+		ch:       ch,
+		quality:  quality,
+		elemSize: elemSize,
 	}, nil
 }
 
@@ -48,10 +54,7 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 		return r.outBuf.Write(input)
 	}
 
-	var t T
-	elemLen := int(reflect.TypeOf(t).Size())
-
-	samples := make([]T, len(input)/elemLen)
+	samples := make([]T, len(input)/r.elemSize)
 	err := binary.Read(bytes.NewReader(input), binary.LittleEndian, &samples)
 	if err != nil {
 		return 0, fmt.Errorf("resampler write: %w", err)
