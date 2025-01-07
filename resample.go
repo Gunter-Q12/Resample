@@ -67,7 +67,7 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	case KaiserFast:
 		output, err = r.kaiserFast(samples)
 	default:
-		return 0, fmt.Errorf("unknown quality: %d", r.quality)
+		err = fmt.Errorf("unknown quality: %d", r.quality)
 	}
 	if err != nil {
 		return 0, err
