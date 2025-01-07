@@ -76,6 +76,25 @@ func TestResampler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, 6, size)
 	})
+
+	t.Run("float64", func(t *testing.T) {
+		outBuf := new(bytes.Buffer)
+
+		inBuf := new(bytes.Buffer)
+		err := binary.Write(inBuf, binary.LittleEndian, []float64{1, 2, 3})
+		assert.NoError(t, err)
+
+		res, err := New[float64](outBuf, 1, 2, ch, Linear)
+		assert.NoError(t, err)
+
+		_, err = res.Write(inBuf.Bytes())
+		assert.NoError(t, err)
+
+		output := make([]float64, 5)
+		err = binary.Read(outBuf, binary.LittleEndian, output)
+		assert.NoError(t, err)
+		assert.Equal(t, []float64{1, 1.5, 2, 2.5, 3}, output)
+	})
 }
 
 func TestGetSincWindow(t *testing.T) {
