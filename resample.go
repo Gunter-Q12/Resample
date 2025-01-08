@@ -87,27 +87,21 @@ func (r *Resampler[T]) linear(samples []T) ([]T, error) {
 
 	ratio := float64(r.outRate) / float64(r.inRate)
 	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
-	y := make([]T, shape)
 
-	precision := 2
-	interpWin := []float64{1, 0.5, 0}
-
-	if ratio < 1 {
-		for i := range interpWin {
-			interpWin[i] *= ratio
-		}
-	}
-
-	interpDelta := getDifferences(interpWin)
-
-	scale := min(1.0, ratio)
+	scale := 1.0
 	timeIncrement := 1.0 / ratio
 
-	timeOut := make([]float64, len(y))
+	timeOut := make([]float64, shape)
 	for i := range timeOut {
 		timeOut[i] = float64(i) * timeIncrement
 	}
 
+	interpWin := []float64{1, 0}
+	precision := 1
+
+	interpDelta := getDifferences(interpWin)
+
+	y := make([]T, shape)
 	r.resample(samples, timeOut, interpWin, interpDelta, precision, scale, &y)
 	return y, nil
 }
