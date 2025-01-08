@@ -32,7 +32,7 @@ func TestResampler(t *testing.T) {
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
 			err: nil, ir: 1, or: 2, q: Linear},
 		{name: "simplest downsampling case",
-			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3, 5},
+			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
 			err: nil, ir: 2, or: 1, q: Linear},
 		{name: "kaiser_fast",
 			input: []int16{1, 2, 3, 4, 5},

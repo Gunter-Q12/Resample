@@ -85,38 +85,81 @@ func (r *Resampler[T]) linear(samples []T) ([]T, error) {
 		return nil, errors.New("input should have at least two samples")
 	}
 
-	outputSize := int((len(samples)-1)*r.outRate/r.inRate) + 1
-	output := make([]T, outputSize)
+	ratio := float64(r.outRate) / float64(r.inRate)
+	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
+	y := make([]T, shape)
 
-	output[0] = samples[0]
+	precision := 2
+	interpWin := []float64{1, 0.5, 0}
 
-	var x float64
-	for i := 1; i < outputSize; i++ {
-		x += float64(r.inRate) / float64(r.outRate)
-
-		var newSample T
-		if math.Abs(x-math.Round(x)) < 1e-6 { // Why this epsilon?
-			newSample = samples[int(math.Round(x))]
-		} else {
-			x0 := math.Floor(x)
-			x1 := math.Ceil(x)
-
-			x0Dist := x - x0
-			x1Dist := x1 - x
-
-			y0 := float64(samples[int(x0)])
-			y1 := float64(samples[int(x1)])
-
-			newSample = T(y0*x1Dist + y1*x0Dist)
+	if ratio < 1 {
+		for i := range interpWin {
+			interpWin[i] *= ratio
 		}
-		output[i] = newSample
 	}
 
-	return output, nil
+	interpDelta := getDifferences(interpWin)
+
+	scale := min(1.0, ratio)
+	timeIncrement := 1.0 / ratio
+
+	timeOut := make([]float64, len(y))
+	for i := range timeOut {
+		timeOut[i] = float64(i) * timeIncrement
+	}
+
+	r.resample(samples, timeOut, interpWin, interpDelta, precision, scale, &y)
+	return y, nil
 }
 
 func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
 	return nil, errors.New("kaiser fast not implemented")
+}
+
+func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []float64,
+	numTable int, scale float64, y *[]T) {
+
+	indexStep := int(scale * float64(numTable))
+	timeRegister := 0.0
+
+	nWin := len(interpWin)
+	nIn := len(samples)
+
+	for t := range timeOut {
+		var newSample float64
+		timeRegister = timeOut[t]
+
+		n := int(timeRegister)
+
+		frac := scale * (timeRegister - float64(n))
+
+		indexFrac := frac * float64(numTable)
+		offset := int(indexFrac)
+
+		eta := indexFrac - float64(offset)
+
+		iMax := min(n+1, (nWin-offset)/indexStep)
+		for i := 0; i < iMax; i++ {
+			weight := interpWin[offset+i*indexStep] +
+				eta*interpDelta[offset+i*indexStep]
+			newSample += weight * float64(samples[n-i])
+		}
+
+		frac = scale - frac
+
+		indexFrac = frac * float64(numTable)
+		offset = int(indexFrac)
+
+		eta = indexFrac - float64(offset)
+
+		kMax := min(nIn-n-1, (nWin-offset)/indexStep)
+		for k := 0; k < kMax; k++ {
+			weight := interpWin[offset+k*indexStep] +
+				eta*interpDelta[offset+k*indexStep]
+			newSample += weight * float64(samples[n+k+1])
+		}
+		(*y)[t] = T(newSample) // TODO: rounding
+	}
 }
 
 func getSincWindow(zeros, precision int, rolloff float64) ([]float64, error) {
@@ -155,4 +198,13 @@ func elementwiseProd(a, b []float64) []float64 {
 		res[i] = a[i] * b[i]
 	}
 	return res
+}
+
+func getDifferences(values []float64) []float64 {
+	diffs := make([]float64, len(values))
+	for i := 0; i < len(values)-1; i++ {
+		diffs[i] = values[i+1] - values[i]
+	}
+	diffs[len(diffs)-1] = 0
+	return diffs
 }
