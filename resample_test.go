@@ -50,6 +50,7 @@ func TestResampler(t *testing.T) {
 			if tt.err != nil {
 				assert.Error(t, err)
 			} else {
+				assert.NoError(t, err)
 				output := readBuff[int16](t, outBuf, len(tt.output))
 				assert.Equal(t, tt.output, output)
 			}
@@ -86,6 +87,7 @@ func TestResampler(t *testing.T) {
 			if tt.err != nil {
 				assert.Error(t, err)
 			} else {
+				assert.NoError(t, err)
 				output := readBuff[float64](t, outBuf, len(tt.output))
 				assert.InDeltaSlicef(t, tt.output, output, .001, "output: %v", output)
 			}
