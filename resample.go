@@ -157,8 +157,7 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 }
 
 func getSincWindow(zeros, precision int) ([]float64, error) {
-	bits := 1 << precision
-	n := bits * zeros
+	n := precision * zeros
 	sincWin := make([]float64, n+1)
 	step := float64(zeros) / float64(n+1)
 	for i := 0; i < n+1; i++ {

@@ -113,7 +113,7 @@ func TestGetSincWindow(t *testing.T) {
 	err = binary.Read(bytes.NewReader(raw), binary.LittleEndian, &want)
 	assert.NoError(t, err)
 
-	got, err := getSincWindow(64, 9)
+	got, err := getSincWindow(16, 8)
 	toFile(t, got, path+"got")
 	assert.NoError(t, err)
 	assert.Lenf(t, got, len(want), "want: %d, got: %d", len(want), len(got))
