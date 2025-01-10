@@ -156,13 +156,13 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 	}
 }
 
-func getSincWindow(zeros, precision int, rolloff float64) ([]float64, error) {
+func getSincWindow(zeros, precision int) ([]float64, error) {
 	bits := 1 << precision
 	n := bits * zeros
 	sincWin := make([]float64, n+1)
 	step := float64(zeros) / float64(n+1)
 	for i := 0; i < n+1; i++ {
-		sincWin[i] = rolloff * sinc(rolloff*(float64(i)*step))
+		sincWin[i] = sinc(float64(i) * step)
 	}
 
 	taper := hanning(2*n + 1)[n:]

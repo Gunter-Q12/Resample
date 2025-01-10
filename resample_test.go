@@ -102,7 +102,7 @@ func TestGetSincWindow(t *testing.T) {
 
 	raw, err := os.ReadFile(path + "want")
 	if errors.Is(err, os.ErrNotExist) {
-		want, err := getSincWindow(64, 9, 0.945)
+		want, err := getSincWindow(64, 9)
 		assert.NoError(t, err)
 		toFile(t, want, path+"got")
 		t.Fatalf("Check saved results.\nRename file form *_got to *_want\nRun the test again")
@@ -113,7 +113,7 @@ func TestGetSincWindow(t *testing.T) {
 	err = binary.Read(bytes.NewReader(raw), binary.LittleEndian, &want)
 	assert.NoError(t, err)
 
-	got, err := getSincWindow(64, 9, 0.945)
+	got, err := getSincWindow(64, 9)
 	toFile(t, got, path+"got")
 	assert.NoError(t, err)
 	assert.Lenf(t, got, len(want), "want: %d, got: %d", len(want), len(got))
