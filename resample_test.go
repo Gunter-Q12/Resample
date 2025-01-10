@@ -98,19 +98,26 @@ func TestResampler(t *testing.T) {
 }
 
 func TestGetSincWindow(t *testing.T) {
-	raw, err := os.ReadFile("./testdata/sinc_window")
-	assert.NoError(t, err)
+	path := "./testdata/sinc_window_"
 
+	raw, err := os.ReadFile(path + "want")
+	if errors.Is(err, os.ErrNotExist) {
+		want, err := getSincWindow(64, 9, 0.945)
+		assert.NoError(t, err)
+		toFile(t, want, path+"got")
+		t.Fatalf("Check saved results.\nRename file form *_got to *_want\nRun the test again")
+	} else if err != nil {
+		t.Fatal(err)
+	}
 	want := make([]float64, len(raw)/8)
 	err = binary.Read(bytes.NewReader(raw), binary.LittleEndian, &want)
 	assert.NoError(t, err)
 
 	got, err := getSincWindow(64, 9, 0.945)
-	//toFile(got, "testdata/sinc_window_go")
+	toFile(t, got, path+"got")
 	assert.NoError(t, err)
 	assert.Lenf(t, got, len(want), "want: %d, got: %d", len(want), len(got))
 	assert.InDeltaSlice(t, want, got, 0.0001)
-
 }
 
 func FuzzResampler(f *testing.F) {
