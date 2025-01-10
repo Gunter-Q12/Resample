@@ -13,7 +13,7 @@ import (
 func TestResampler(t *testing.T) {
 	ch := 1
 
-	resamplerTest := []struct {
+	resamplerTestInt16 := []struct {
 		name   string
 		input  []int16
 		output []int16
@@ -38,7 +38,7 @@ func TestResampler(t *testing.T) {
 			input: []int16{1, 2, 3, 4, 5},
 			err:   errors.New(""), ir: 2, or: 1, q: KaiserFast},
 	}
-	for _, tt := range resamplerTest {
+	for _, tt := range resamplerTestInt16 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 
@@ -59,6 +59,45 @@ func TestResampler(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.Equal(t, tt.output, output)
+			}
+		})
+	}
+
+	resamplerTestFloat64 := []struct {
+		name   string
+		input  []float64
+		output []float64
+		err    error
+		ir     int
+		or     int
+		q      Quality
+	}{
+		{name: "real numbers",
+			input:  []float64{0, 0.25, 0.5, 0.75},
+			output: []float64{0, 1.0 / 3, 2.0 / 3},
+			err:    nil, ir: 4, or: 3, q: Linear},
+	}
+	for _, tt := range resamplerTestFloat64 {
+		t.Run(tt.name, func(t *testing.T) {
+			outBuf := new(bytes.Buffer)
+
+			inBuf := new(bytes.Buffer)
+			err := binary.Write(inBuf, binary.LittleEndian, tt.input)
+			assert.NoError(t, err)
+
+			res, err := New[float64](outBuf, tt.ir, tt.or, ch, tt.q)
+			assert.NoError(t, err)
+
+			_, err = res.Write(inBuf.Bytes())
+			if tt.err != nil {
+				assert.Error(t, err)
+			}
+			if tt.err == nil {
+				output := make([]float64, len(tt.output))
+				err := binary.Read(outBuf, binary.LittleEndian, output)
+
+				assert.NoError(t, err)
+				assert.InDeltaSlicef(t, tt.output, output, .001, "output: %v", output)
 			}
 		})
 	}
