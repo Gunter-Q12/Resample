@@ -15,23 +15,66 @@ type Number interface {
 	constraints.Float | constraints.Integer
 }
 
-type Quality int
+type Filter interface {
+	GetValue(position float64) float64
+	GetDensity() int
+	GetLength() int
+}
 
-const (
-	Linear Quality = iota // Linear interpolation
-	KaiserFast
-)
+type LinearFilter struct {
+}
+
+func (lr LinearFilter) GetValue(position float64) float64 {
+	return position
+}
+
+func (lr LinearFilter) GetDensity() int {
+	return 1
+}
+
+func (lr LinearFilter) GetLength() int {
+	return 2
+}
+
+func NewLinearFilter() LinearFilter {
+	return LinearFilter{}
+}
+
+type KaiserFastFilter struct {
+	interpWin   []float64
+	interpDelta []float64
+	density     int
+}
+
+func (k KaiserFastFilter) GetValue(position float64) float64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (k KaiserFastFilter) GetDensity() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (k KaiserFastFilter) GetLength() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func NewKaiserFastFilter() KaiserFastFilter {
+	return KaiserFastFilter{}
+}
 
 type Resampler[T Number] struct {
 	outBuf   io.Writer
 	inRate   int
 	outRate  int
 	ch       int
-	quality  Quality
+	filter   Filter
 	elemSize int
 }
 
-func New[T Number](outBuffer io.Writer, inRate, outRate, ch int, quality Quality) (*Resampler[T], error) {
+func New[T Number](outBuffer io.Writer, inRate, outRate, ch int, filter Filter) (*Resampler[T], error) {
 	if inRate <= 0 || outRate <= 0 {
 		return nil, errors.New("sampling rates must be greater than zero")
 	}
@@ -44,7 +87,7 @@ func New[T Number](outBuffer io.Writer, inRate, outRate, ch int, quality Quality
 		inRate:   inRate,
 		outRate:  outRate,
 		ch:       ch,
-		quality:  quality,
+		filter:   filter,
 		elemSize: elemSize,
 	}, nil
 }
@@ -61,13 +104,13 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	}
 
 	var output []T
-	switch r.quality {
-	case Linear:
+	switch t := r.filter.(type) {
+	case LinearFilter:
 		output, err = r.linear(samples)
-	case KaiserFast:
+	case KaiserFastFilter:
 		output, err = r.kaiserFast(samples)
 	default:
-		err = fmt.Errorf("unknown quality: %d", r.quality)
+		err = fmt.Errorf("custom filters are not supported: %v", t)
 	}
 	if err != nil {
 		return 0, err

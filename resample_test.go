@@ -20,27 +20,27 @@ func TestResampler(t *testing.T) {
 		err    error
 		ir     int
 		or     int
-		q      Quality
+		filter Filter
 	}{
 		{name: "in=out",
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
-			err: nil, ir: 1, or: 1, q: Linear},
+			err: nil, ir: 1, or: 1, filter: NewLinearFilter()},
 		{name: "not enough samples",
 			input: []int16{1},
-			err:   errors.New(""), ir: 1, or: 2, q: Linear},
+			err:   errors.New(""), ir: 1, or: 2, filter: NewLinearFilter()},
 		{name: "simplest upsampling case",
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
-			err: nil, ir: 1, or: 2, q: Linear},
+			err: nil, ir: 1, or: 2, filter: NewLinearFilter()},
 		{name: "simplest downsampling case",
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
-			err: nil, ir: 2, or: 1, q: Linear},
+			err: nil, ir: 2, or: 1, filter: NewLinearFilter()},
 	}
 	for _, tt := range resamplerTestInt16 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := writeBuff(t, tt.input)
 
-			res, err := New[int16](outBuf, tt.ir, tt.or, ch, tt.q)
+			res, err := New[int16](outBuf, tt.ir, tt.or, ch, tt.filter)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -73,27 +73,27 @@ func TestResampler(t *testing.T) {
 		err    error
 		ir     int
 		or     int
-		q      Quality
+		filter Filter
 	}{
 		{name: "real downsampling",
 			input:  []float64{0, 0.25, 0.5, 0.75},
 			output: []float64{0, 1.0 / 3, 2.0 / 3},
-			err:    nil, ir: 4, or: 3, q: Linear},
+			err:    nil, ir: 4, or: 3, filter: NewLinearFilter()},
 		{name: "real upsampling",
 			input:  []float64{1, 2, 3},
 			output: []float64{1, 1.5, 2, 2.5, 3},
-			err:    nil, ir: 2, or: 4, q: Linear},
+			err:    nil, ir: 2, or: 4, filter: NewLinearFilter()},
 		{name: "KaiserFast downsampling",
 			input:  sine8000,
 			output: sine125,
-			err:    nil, ir: 8000, or: 125, q: KaiserFast},
+			err:    nil, ir: 8000, or: 125, filter: NewLinearFilter()},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := writeBuff(t, tt.input)
 
-			res, err := New[float64](outBuf, tt.ir, tt.or, ch, tt.q)
+			res, err := New[float64](outBuf, tt.ir, tt.or, ch, tt.filter)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -111,7 +111,7 @@ func TestResampler(t *testing.T) {
 		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
 
-		res, err := New[int16](outBuf, 1, 2, ch, Linear)
+		res, err := New[int16](outBuf, 1, 2, ch, NewLinearFilter())
 		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)
@@ -150,7 +150,7 @@ func FuzzResampler(f *testing.F) {
 			return
 		}
 
-		res, err := New[int16](io.Discard, ir, or, 1, Linear)
+		res, err := New[int16](io.Discard, ir, or, 1, NewLinearFilter())
 		if err != nil {
 			return
 		}
