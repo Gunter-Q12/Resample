@@ -127,15 +127,32 @@ func FuzzResampler(f *testing.F) {
 	})
 }
 
-func toFile(values any, path string) {
+func toFile(t *testing.T, values any, path string) {
+	t.Helper()
+
 	file, err := os.Create(path)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 	defer file.Close()
 
 	err = binary.Write(file, binary.LittleEndian, values)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
+	}
+}
+
+func fromFile(t *testing.T, values any, path string) {
+	t.Helper()
+
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	err = binary.Read(file, binary.LittleEndian, values)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
