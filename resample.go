@@ -111,48 +111,48 @@ func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
 }
 
 func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []float64,
-	numTable int, scale float64, y *[]T) {
+	precision int, scale float64, y *[]T) {
 
-	indexStep := int(scale * float64(numTable))
-	timeRegister := 0.0
+	winLen := len(interpWin)
+	samplesLen := len(samples)
 
-	nWin := len(interpWin)
-	nIn := len(samples)
-
-	for t := range timeOut {
+	for t := range *y {
 		var newSample float64
-		timeRegister = timeOut[t]
 
-		n := int(timeRegister)
+		timeRegister := timeOut[t]
 
-		frac := scale * (timeRegister - float64(n))
+		sampleId := int(timeRegister)
+		frac := scale * (timeRegister - float64(sampleId))
+		step := float64(precision) * scale
+		filterId := int(frac * float64(precision))
+		frac -= float64(filterId) * (1 / float64(precision))
 
-		indexFrac := frac * float64(numTable)
-		offset := int(indexFrac)
+		// computing left wing (because of the middle element)
+		i := 0
+		for sampleId-i >= 0 && int(float64(filterId)+step*float64(i)) < winLen {
+			currFilter := int(float64(filterId) + step*float64(i))
+			currFrac := frac + step*float64(i) - float64(int(frac+step*float64(i)))
 
-		eta := indexFrac - float64(offset)
-
-		iMax := min(n+1, (nWin-offset)/indexStep)
-		for i := 0; i < iMax; i++ {
-			weight := interpWin[offset+i*indexStep] +
-				eta*interpDelta[offset+i*indexStep]
-			newSample += weight * float64(samples[n-i])
+			weight := interpWin[currFilter] + currFrac*interpDelta[currFilter]
+			newSample += weight * float64(samples[sampleId-i])
+			i += 1
 		}
 
-		frac = scale - frac
+		frac = scale * (1 - (timeRegister - float64(sampleId)))
+		filterId = int(frac * float64(precision))
+		frac -= float64(filterId) * (1 / float64(precision))
 
-		indexFrac = frac * float64(numTable)
-		offset = int(indexFrac)
+		// computing right wing
+		i = 0
+		for (sampleId+i+1) < samplesLen && int(float64(filterId)+step*float64(i)) < winLen {
+			currFilter := int(float64(filterId) + step*float64(i))
+			currFrac := frac + step*float64(i) - float64(int(frac+step*float64(i)))
 
-		eta = indexFrac - float64(offset)
-
-		kMax := min(nIn-n-1, (nWin-offset)/indexStep)
-		for k := 0; k < kMax; k++ {
-			weight := interpWin[offset+k*indexStep] +
-				eta*interpDelta[offset+k*indexStep]
-			newSample += weight * float64(samples[n+k+1])
+			weight := interpWin[currFilter] + currFrac*interpDelta[currFilter]
+			newSample += weight * float64(samples[sampleId+i+1])
+			i += 1
 		}
-		(*y)[t] = T(newSample) // TODO: rounding
+		(*y)[t] = T(newSample) // TODO: proper rounding
 	}
 }
 
