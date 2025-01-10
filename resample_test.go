@@ -41,10 +41,7 @@ func TestResampler(t *testing.T) {
 	for _, tt := range resamplerTestInt16 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
-
-			inBuf := new(bytes.Buffer)
-			err := binary.Write(inBuf, binary.LittleEndian, tt.input)
-			assert.NoError(t, err)
+			inBuf := writeBuff(t, tt.input)
 
 			res, err := New[int16](outBuf, tt.ir, tt.or, ch, tt.q)
 			assert.NoError(t, err)
@@ -52,12 +49,8 @@ func TestResampler(t *testing.T) {
 			_, err = res.Write(inBuf.Bytes())
 			if tt.err != nil {
 				assert.Error(t, err)
-			}
-			if tt.err == nil {
-				output := make([]int16, len(tt.output))
-				err := binary.Read(outBuf, binary.LittleEndian, output)
-
-				assert.NoError(t, err)
+			} else {
+				output := readBuff[int16](t, outBuf, len(tt.output))
 				assert.Equal(t, tt.output, output)
 			}
 		})
@@ -72,18 +65,19 @@ func TestResampler(t *testing.T) {
 		or     int
 		q      Quality
 	}{
-		{name: "real numbers",
+		{name: "real downsampling",
 			input:  []float64{0, 0.25, 0.5, 0.75},
 			output: []float64{0, 1.0 / 3, 2.0 / 3},
 			err:    nil, ir: 4, or: 3, q: Linear},
+		{name: "real upsampling",
+			input:  []float64{1, 2, 3},
+			output: []float64{1, 1.5, 2, 2.5, 3},
+			err:    nil, ir: 2, or: 4, q: Linear},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
-
-			inBuf := new(bytes.Buffer)
-			err := binary.Write(inBuf, binary.LittleEndian, tt.input)
-			assert.NoError(t, err)
+			inBuf := writeBuff(t, tt.input)
 
 			res, err := New[float64](outBuf, tt.ir, tt.or, ch, tt.q)
 			assert.NoError(t, err)
@@ -91,23 +85,17 @@ func TestResampler(t *testing.T) {
 			_, err = res.Write(inBuf.Bytes())
 			if tt.err != nil {
 				assert.Error(t, err)
-			}
-			if tt.err == nil {
-				output := make([]float64, len(tt.output))
-				err := binary.Read(outBuf, binary.LittleEndian, output)
-
-				assert.NoError(t, err)
+			} else {
+				output := readBuff[float64](t, outBuf, len(tt.output))
 				assert.InDeltaSlicef(t, tt.output, output, .001, "output: %v", output)
 			}
 		})
 	}
 
 	t.Run("io.Copy", func(t *testing.T) {
-		inBuf := new(bytes.Buffer)
-		err := binary.Write(inBuf, binary.LittleEndian, []int16{1, 3, 5})
-		assert.NoError(t, err)
-
+		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
+
 		res, err := New[int16](outBuf, 1, 2, ch, Linear)
 		assert.NoError(t, err)
 
@@ -115,46 +103,28 @@ func TestResampler(t *testing.T) {
 		assert.NoError(t, err)
 		assert.EqualValues(t, 6, size)
 	})
-
-	t.Run("float64", func(t *testing.T) {
-		outBuf := new(bytes.Buffer)
-
-		inBuf := new(bytes.Buffer)
-		err := binary.Write(inBuf, binary.LittleEndian, []float64{1, 2, 3})
-		assert.NoError(t, err)
-
-		res, err := New[float64](outBuf, 1, 2, ch, Linear)
-		assert.NoError(t, err)
-
-		_, err = res.Write(inBuf.Bytes())
-		assert.NoError(t, err)
-
-		output := make([]float64, 5)
-		err = binary.Read(outBuf, binary.LittleEndian, output)
-		assert.NoError(t, err)
-		assert.Equal(t, []float64{1, 1.5, 2, 2.5, 3}, output)
-	})
 }
 
 func TestGetSincWindow(t *testing.T) {
 	path := "./testdata/sinc_window_"
+	zeros := 16
+	precision := 8
 
-	raw, err := os.ReadFile(path + "want")
+	file, err := os.OpenFile(path+"want", os.O_RDONLY, 0666)
 	if errors.Is(err, os.ErrNotExist) {
-		want, err := getSincWindow(64, 9)
+		want, err := getSincWindow(zeros, precision)
 		assert.NoError(t, err)
 		toFile(t, want, path+"got")
 		t.Fatalf("Check saved results.\nRename file form *_got to *_want\nRun the test again")
 	} else if err != nil {
 		t.Fatal(err)
 	}
-	want := make([]float64, len(raw)/8)
-	err = binary.Read(bytes.NewReader(raw), binary.LittleEndian, &want)
+	want := readBuff[float64](t, file, zeros*precision+1)
+
+	got, err := getSincWindow(zeros, precision)
 	assert.NoError(t, err)
 
-	got, err := getSincWindow(16, 8)
 	toFile(t, got, path+"got")
-	assert.NoError(t, err)
 	assert.Lenf(t, got, len(want), "want: %d, got: %d", len(want), len(got))
 	assert.InDeltaSlice(t, want, got, 0.0001)
 }
@@ -188,17 +158,20 @@ func toFile(t *testing.T, values any, path string) {
 	}
 }
 
-func fromFile(t *testing.T, values any, path string) {
-	t.Helper()
-
-	file, err := os.Open(path)
+func writeBuff(t *testing.T, values any) *bytes.Buffer {
+	inBuf := new(bytes.Buffer)
+	err := binary.Write(inBuf, binary.LittleEndian, values)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer file.Close()
+	return inBuf
+}
 
-	err = binary.Read(file, binary.LittleEndian, values)
-	if err != nil {
-		t.Fatal(err)
-	}
+func readBuff[T any](t *testing.T, buff io.Reader, len int) []T {
+	output := make([]T, len)
+
+	err := binary.Read(buff, binary.LittleEndian, output)
+	assert.NoError(t, err)
+
+	return output
 }
