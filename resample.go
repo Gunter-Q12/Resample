@@ -25,7 +25,7 @@ type LinearFilter struct {
 }
 
 func (lr LinearFilter) GetValue(position float64) float64 {
-	return position
+	return max(0, 1-position)
 }
 
 func (lr LinearFilter) GetDensity() int {
@@ -49,16 +49,19 @@ type KaiserFastFilter struct {
 func (k KaiserFastFilter) GetValue(position float64) float64 {
 	//TODO implement me
 	panic("implement me")
+	return 0
 }
 
 func (k KaiserFastFilter) GetDensity() int {
 	//TODO implement me
 	panic("implement me")
+	return 0
 }
 
 func (k KaiserFastFilter) GetLength() int {
 	//TODO implement me
 	panic("implement me")
+	return 0
 }
 
 func NewKaiserFastFilter() KaiserFastFilter {
@@ -139,24 +142,12 @@ func (r *Resampler[T]) linear(samples []T) ([]T, error) {
 		timeOut[i] = float64(i) * timeIncrement
 	}
 
-	interpWin := []float64{1, 0}
-	density := 1
-
-	interpDelta := getDifferences(interpWin)
-
 	y := make([]T, shape)
-	r.resample(samples, timeOut, interpWin, interpDelta, density, scale, &y)
+	r.resample(samples, timeOut, scale, &y)
 	return y, nil
 }
 
 func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
-	density := 512
-	interpWin, err := getSincWindow(24, density)
-	if err != nil {
-		return nil, err
-	}
-	interpDelta := getDifferences(interpWin)
-
 	ratio := float64(r.outRate) / float64(r.inRate)
 	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
 
@@ -167,20 +158,15 @@ func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
 	}
 
 	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-	for i := range interpWin {
-		interpWin[i] *= scale
-		interpDelta[i] *= scale
-	}
 
 	y := make([]T, shape)
-	r.resample(samples, timeOut, interpWin, interpDelta, density, scale, &y)
+	r.resample(samples, timeOut, scale, &y)
 	return y, nil
 }
 
-func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []float64,
-	density int, scale float64, y *[]T) {
+func (r *Resampler[T]) resample(samples []T, timeOut []float64, scale float64, y *[]T) {
 
-	winLen := len(interpWin)
+	winLen := r.filter.GetLength()
 	samplesLen := len(samples)
 
 	for t := range *y {
@@ -190,9 +176,9 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 
 		sampleId := int(timeRegister)
 		frac := scale * (timeRegister - float64(sampleId))
-		step := float64(density) * scale
-		filterId := int(frac * float64(density))
-		frac -= float64(filterId) * (1 / float64(density))
+		step := float64(r.filter.GetDensity()) * scale
+		filterId := int(frac * float64(r.filter.GetDensity()))
+		frac -= float64(filterId) * (1 / float64(r.filter.GetDensity()))
 
 		// computing left wing (because of the middle element)
 		i := 0
@@ -200,14 +186,14 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 			currFilter := int(float64(filterId) + step*float64(i))
 			currFrac := frac + step*float64(i) - float64(int(frac+step*float64(i)))
 
-			weight := interpWin[currFilter] + currFrac*interpDelta[currFilter]
+			weight := scale * r.filter.GetValue(float64(currFilter)+currFrac)
 			newSample += weight * float64(samples[sampleId-i])
 			i += 1
 		}
 
 		frac = scale * (1 - (timeRegister - float64(sampleId)))
-		filterId = int(frac * float64(density))
-		frac -= float64(filterId) * (1 / float64(density))
+		filterId = int(frac * float64(r.filter.GetDensity()))
+		frac -= float64(filterId) * (1 / float64(r.filter.GetDensity()))
 
 		// computing right wing
 		i = 0
@@ -215,7 +201,7 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 			currFilter := int(float64(filterId) + step*float64(i))
 			currFrac := frac + step*float64(i) - float64(int(frac+step*float64(i)))
 
-			weight := interpWin[currFilter] + currFrac*interpDelta[currFilter]
+			weight := scale * r.filter.GetValue(float64(currFilter)+currFrac)
 			newSample += weight * float64(samples[sampleId+i+1])
 			i += 1
 		}
