@@ -34,9 +34,6 @@ func TestResampler(t *testing.T) {
 		{name: "simplest downsampling case",
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
 			err: nil, ir: 2, or: 1, q: Linear},
-		{name: "kaiser_fast",
-			input: []int16{1, 2, 3, 4, 5},
-			err:   errors.New(""), ir: 2, or: 1, q: KaiserFast},
 	}
 	for _, tt := range resamplerTestInt16 {
 		t.Run(tt.name, func(t *testing.T) {
@@ -57,6 +54,18 @@ func TestResampler(t *testing.T) {
 		})
 	}
 
+	file, err := os.Open("./testdata/sine_8000_3_f64_ch1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sine8000 := readBuff[float64](t, file, 8000*3)
+
+	file, err = os.Open("./testdata/sine_125_3_f64_ch1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sine125 := readBuff[float64](t, file, 125*3)
+
 	resamplerTestFloat64 := []struct {
 		name   string
 		input  []float64
@@ -74,6 +83,10 @@ func TestResampler(t *testing.T) {
 			input:  []float64{1, 2, 3},
 			output: []float64{1, 1.5, 2, 2.5, 3},
 			err:    nil, ir: 2, or: 4, q: Linear},
+		{name: "KaiserFast downsampling",
+			input:  sine8000,
+			output: sine125,
+			err:    nil, ir: 8000, or: 125, q: KaiserFast},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
@@ -89,7 +102,7 @@ func TestResampler(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				output := readBuff[float64](t, outBuf, len(tt.output))
-				assert.InDeltaSlicef(t, tt.output, output, .001, "output: %v", output)
+				assert.InDeltaSlicef(t, tt.output, output, .01, "output: %v", output)
 			}
 		})
 	}

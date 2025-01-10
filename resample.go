@@ -107,7 +107,31 @@ func (r *Resampler[T]) linear(samples []T) ([]T, error) {
 }
 
 func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
-	return nil, errors.New("kaiser fast not implemented")
+	density := 512
+	interpWin, err := getSincWindow(24, density)
+	if err != nil {
+		return nil, err
+	}
+	interpDelta := getDifferences(interpWin)
+
+	ratio := float64(r.outRate) / float64(r.inRate)
+	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
+
+	timeIncrement := 1.0 / ratio
+	timeOut := make([]float64, shape)
+	for i := range timeOut {
+		timeOut[i] = float64(i) * timeIncrement
+	}
+
+	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+	for i := range interpWin {
+		interpWin[i] *= scale
+		interpDelta[i] *= scale
+	}
+
+	y := make([]T, shape)
+	r.resample(samples, timeOut, interpWin, interpDelta, density, scale, &y)
+	return y, nil
 }
 
 func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []float64,
