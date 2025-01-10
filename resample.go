@@ -97,12 +97,12 @@ func (r *Resampler[T]) linear(samples []T) ([]T, error) {
 	}
 
 	interpWin := []float64{1, 0}
-	precision := 1
+	density := 1
 
 	interpDelta := getDifferences(interpWin)
 
 	y := make([]T, shape)
-	r.resample(samples, timeOut, interpWin, interpDelta, precision, scale, &y)
+	r.resample(samples, timeOut, interpWin, interpDelta, density, scale, &y)
 	return y, nil
 }
 
@@ -111,7 +111,7 @@ func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
 }
 
 func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []float64,
-	precision int, scale float64, y *[]T) {
+	density int, scale float64, y *[]T) {
 
 	winLen := len(interpWin)
 	samplesLen := len(samples)
@@ -123,9 +123,9 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 
 		sampleId := int(timeRegister)
 		frac := scale * (timeRegister - float64(sampleId))
-		step := float64(precision) * scale
-		filterId := int(frac * float64(precision))
-		frac -= float64(filterId) * (1 / float64(precision))
+		step := float64(density) * scale
+		filterId := int(frac * float64(density))
+		frac -= float64(filterId) * (1 / float64(density))
 
 		// computing left wing (because of the middle element)
 		i := 0
@@ -139,8 +139,8 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 		}
 
 		frac = scale * (1 - (timeRegister - float64(sampleId)))
-		filterId = int(frac * float64(precision))
-		frac -= float64(filterId) * (1 / float64(precision))
+		filterId = int(frac * float64(density))
+		frac -= float64(filterId) * (1 / float64(density))
 
 		// computing right wing
 		i = 0
@@ -156,8 +156,8 @@ func (r *Resampler[T]) resample(samples []T, timeOut, interpWin, interpDelta []f
 	}
 }
 
-func getSincWindow(zeros, precision int) ([]float64, error) {
-	n := precision * zeros
+func getSincWindow(zeros, density int) ([]float64, error) {
+	n := density * zeros
 	sincWin := make([]float64, n+1)
 	step := float64(zeros) / float64(n+1)
 	for i := 0; i < n+1; i++ {

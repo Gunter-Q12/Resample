@@ -108,20 +108,20 @@ func TestResampler(t *testing.T) {
 func TestGetSincWindow(t *testing.T) {
 	path := "./testdata/sinc_window_"
 	zeros := 16
-	precision := 8
+	density := 8
 
 	file, err := os.OpenFile(path+"want", os.O_RDONLY, 0666)
 	if errors.Is(err, os.ErrNotExist) {
-		want, err := getSincWindow(zeros, precision)
+		want, err := getSincWindow(zeros, density)
 		assert.NoError(t, err)
 		toFile(t, want, path+"got")
 		t.Fatalf("Check saved results.\nRename file form *_got to *_want\nRun the test again")
 	} else if err != nil {
 		t.Fatal(err)
 	}
-	want := readBuff[float64](t, file, zeros*precision+1)
+	want := readBuff[float64](t, file, zeros*density+1)
 
-	got, err := getSincWindow(zeros, precision)
+	got, err := getSincWindow(zeros, density)
 	assert.NoError(t, err)
 
 	toFile(t, got, path+"got")
