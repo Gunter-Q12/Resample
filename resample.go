@@ -119,8 +119,6 @@ func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
 }
 
 func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y *[]T) {
-
-	//winLen := r.filter.GetLength()
 	samplesLen := len(samples)
 
 	for t := range *y {
@@ -130,10 +128,6 @@ func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y
 		offset := timeRegister - float64(int(timeRegister))
 
 		sampleId := int(timeRegister)
-		frac := scale * (timeRegister - float64(sampleId))
-		//step := float64(r.filter.GetDensity()) * scale
-		filterId := int(frac * float64(r.filter.GetDensity()))
-		frac -= float64(filterId) * (1 / float64(r.filter.GetDensity()))
 
 		// computing left wing (because of the middle element)
 		i := 0
@@ -145,9 +139,6 @@ func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y
 		}
 
 		offset = 1 - offset
-		frac = scale * (1 - (timeRegister - float64(sampleId)))
-		filterId = int(frac * float64(r.filter.GetDensity()))
-		frac -= float64(filterId) * (1 / float64(r.filter.GetDensity()))
 
 		// computing right wing
 		i = 0
