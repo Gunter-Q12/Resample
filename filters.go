@@ -31,32 +31,30 @@ func NewLinearFilter() LinearFilter {
 	return LinearFilter{}
 }
 
-type KaiserFastFilter struct {
+type KaiserFilter struct {
 	interpWin   []float64
 	interpDelta []float64
 	density     int
 }
 
-func (k KaiserFastFilter) GetValue(position float64) float64 {
+func (k KaiserFilter) GetValue(position float64) float64 {
 	sample := int(position)
 	frac := position - float64(sample)
 
 	return k.interpWin[sample] + frac*k.interpDelta[sample]
 }
 
-func (k KaiserFastFilter) GetDensity() int {
+func (k KaiserFilter) GetDensity() int {
 	return k.density
 }
 
-func (k KaiserFastFilter) GetLength() int {
+func (k KaiserFilter) GetLength() int {
 	return len(k.interpWin)
 }
 
-func NewKaiserFastFilter() KaiserFastFilter {
-	density := 512
-	length := 12289
+func newKaiserFilter(path string, density, length int) KaiserFilter {
 	interpWin := make([]float64, length)
-	file, err := os.OpenFile("filters/kaiser_fast_f64", os.O_RDONLY, os.ModePerm)
+	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
@@ -67,11 +65,19 @@ func NewKaiserFastFilter() KaiserFastFilter {
 
 	interpDelta := getDifferences(interpWin)
 
-	return KaiserFastFilter{
+	return KaiserFilter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
 		density:     density,
 	}
+}
+
+func NewKaiserFastFilter() KaiserFilter {
+	return newKaiserFilter("filters/kaiser_fast_f64", 512, 12289)
+}
+
+func NewKaiserBestFilter() KaiserFilter {
+	return newKaiserFilter("filters/kaiser_best_f64", 8192, 409601)
 }
 
 func getSincWindow(zeros, density int) ([]float64, error) {

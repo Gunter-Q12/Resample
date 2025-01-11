@@ -56,7 +56,7 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	switch t := r.filter.(type) {
 	case LinearFilter:
 		output, err = r.linear(samples)
-	case KaiserFastFilter:
+	case KaiserFilter:
 		output, err = r.kaiserFast(samples)
 	default:
 		err = fmt.Errorf("custom filters are not supported: %v", t)
