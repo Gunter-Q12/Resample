@@ -60,65 +60,29 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
 
-	var output []T
-	switch t := r.filter.(type) {
-	case *linearFilter:
-		output, err = r.linear(samples)
-	case *kaiserFilter:
-		output, err = r.kaiserFast(samples)
-	default:
-		err = fmt.Errorf("custom filters are not supported: %v", t)
-	}
-	if err != nil {
-		return 0, err
+	if len(samples) < 2 {
+		return 0, errors.New("input should have at least two samples")
 	}
 
-	err = binary.Write(r.outBuf, binary.LittleEndian, output)
+	timeIncrement := float64(r.inRate) / float64(r.outRate)
+	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
+	timeOut := make([]float64, shape)
+	for i := range timeOut {
+		timeOut[i] = float64(i) * timeIncrement
+	}
+
+	y := make([]T, shape)
+
+	r.convolve(samples, timeOut, &y)
+
+	err = binary.Write(r.outBuf, binary.LittleEndian, y)
 	if err != nil {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
 	return len(input), nil
 }
 
-func (r *Resampler[T]) linear(samples []T) ([]T, error) {
-	if len(samples) < 2 {
-		return nil, errors.New("input should have at least two samples")
-	}
-
-	ratio := float64(r.outRate) / float64(r.inRate)
-	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
-
-	scale := 1.0
-	timeIncrement := 1.0 / ratio
-
-	timeOut := make([]float64, shape)
-	for i := range timeOut {
-		timeOut[i] = float64(i) * timeIncrement
-	}
-
-	y := make([]T, shape)
-	r.convolve(samples, timeOut, scale, &y)
-	return y, nil
-}
-
-func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
-	ratio := float64(r.outRate) / float64(r.inRate)
-	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
-
-	timeIncrement := 1.0 / ratio
-	timeOut := make([]float64, shape)
-	for i := range timeOut {
-		timeOut[i] = float64(i) * timeIncrement
-	}
-
-	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-
-	y := make([]T, shape)
-	r.convolve(samples, timeOut, scale, &y)
-	return y, nil
-}
-
-func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y *[]T) {
+func (r *Resampler[T]) convolve(samples []T, timeOut []float64, y *[]T) {
 	samplesLen := len(samples)
 
 	for t := range *y {
