@@ -24,7 +24,7 @@ type Resampler[T Number] struct {
 }
 
 func New[T Number](outBuffer io.Writer, inRate, outRate, ch int,
-	options ...option[T]) (*Resampler[T], error) {
+	options ...Option[T]) (*Resampler[T], error) {
 	if inRate <= 0 || outRate <= 0 {
 		return nil, errors.New("sampling rates must be greater than zero")
 	}

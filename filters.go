@@ -7,31 +7,37 @@ import (
 	"os"
 )
 
-type option[T Number] func(*Resampler[T]) error
+type Option[T Number] func(*Resampler[T]) error
 
-func LinearFilter[T Number](r *Resampler[T]) error {
-	r.filter = &linearFilter{}
-	return nil
+func LinearFilter[T Number]() Option[T] {
+	return func(r *Resampler[T]) error {
+		r.filter = &linearFilter{}
+		return nil
+	}
 }
 
-func KaiserFastFilter[T Number](r *Resampler[T]) error {
-	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-	filter, err := newKaiserFilter("filters/kaiser_fast_f64", 512, 12289, scale)
-	if err != nil {
-		return fmt.Errorf("new kaiser fast filter: %w", err)
+func KaiserFastFilter[T Number]() Option[T] {
+	return func(r *Resampler[T]) error {
+		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+		filter, err := newKaiserFilter("filters/kaiser_fast_f64", 512, 12289, scale)
+		if err != nil {
+			return fmt.Errorf("new kaiser fast filter: %w", err)
+		}
+		r.filter = filter
+		return nil
 	}
-	r.filter = filter
-	return nil
 }
 
-func KaiserBestFilter[T Number](r *Resampler[T]) error {
-	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-	filter, err := newKaiserFilter("filters/kaiser_best_f64", 8192, 409601, scale)
-	if err != nil {
-		return fmt.Errorf("new kaiser best filter: %w", err)
+func KaiserBestFilter[T Number]() Option[T] {
+	return func(r *Resampler[T]) error {
+		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+		filter, err := newKaiserFilter("filters/kaiser_best_f64", 8192, 409601, scale)
+		if err != nil {
+			return fmt.Errorf("new kaiser best filter: %w", err)
+		}
+		r.filter = filter
+		return nil
 	}
-	r.filter = filter
-	return nil
 }
 
 type Filter interface {
