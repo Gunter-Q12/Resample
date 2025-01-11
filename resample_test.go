@@ -111,6 +111,10 @@ func TestResamplerFloat(t *testing.T) {
 			input:  sine125,
 			output: sine8000,
 			err:    nil, ir: 125, or: 8000, filter: KaiserBestFilter[float64]()},
+		{name: "Hanning uplampling",
+			input:  sine125,
+			output: sine8000,
+			err:    nil, ir: 125, or: 8000, filter: HanningFilter[float64](64, 9)},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
@@ -142,7 +146,7 @@ func TestGetSincWindow(t *testing.T) {
 
 	file, err := os.OpenFile(path+"want", os.O_RDONLY, 0666)
 	if errors.Is(err, os.ErrNotExist) {
-		want, err := getSincWindow(zeros, density)
+		want, err := getHanningWindow(zeros, density)
 		assert.NoError(t, err)
 		toFile(t, want, path+"got")
 		t.Fatalf("Check saved results.\nRename file form *_got to *_want\nRun the test again")
@@ -151,7 +155,7 @@ func TestGetSincWindow(t *testing.T) {
 	}
 	want := readBuff[float64](t, file, zeros*density+1)
 
-	got, err := getSincWindow(zeros, density)
+	got, err := getHanningWindow(zeros, density)
 	assert.NoError(t, err)
 
 	toFile(t, got, path+"got")

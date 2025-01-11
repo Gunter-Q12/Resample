@@ -40,6 +40,29 @@ func KaiserBestFilter[T Number]() Option[T] {
 	}
 }
 
+func HanningFilter[T Number](zeros, density int) Option[T] {
+	return func(r *Resampler[T]) error {
+		interpWin, err := getHanningWindow(zeros, density)
+		if err != nil {
+			return err
+		}
+
+		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+		for i := range interpWin {
+			interpWin[i] *= scale
+		}
+
+		interpDelta := getDifferences(interpWin)
+
+		r.filter = &windowFilter{
+			interpWin:   interpWin,
+			interpDelta: interpDelta,
+			density:     density,
+		}
+		return nil
+	}
+}
+
 type Filter interface {
 	GetPoint(offset float64, index int) (float64, error)
 }
@@ -95,7 +118,7 @@ func newKaiserFilter(path string, density, length int, scale float64) (*windowFi
 	}, nil
 }
 
-func getSincWindow(zeros, density int) ([]float64, error) {
+func getHanningWindow(zeros, density int) ([]float64, error) {
 	n := density * zeros
 	sincWin := make([]float64, n+1)
 	step := float64(zeros) / float64(n+1)
