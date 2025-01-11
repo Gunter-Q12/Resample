@@ -97,7 +97,7 @@ func (r *Resampler[T]) linear(samples []T) ([]T, error) {
 	}
 
 	y := make([]T, shape)
-	r.resample(samples, timeOut, scale, &y)
+	r.convolve(samples, timeOut, scale, &y)
 	return y, nil
 }
 
@@ -114,11 +114,11 @@ func (r *Resampler[T]) kaiserFast(samples []T) ([]T, error) {
 	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
 
 	y := make([]T, shape)
-	r.resample(samples, timeOut, scale, &y)
+	r.convolve(samples, timeOut, scale, &y)
 	return y, nil
 }
 
-func (r *Resampler[T]) resample(samples []T, timeOut []float64, scale float64, y *[]T) {
+func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y *[]T) {
 
 	winLen := r.filter.GetLength()
 	samplesLen := len(samples)
