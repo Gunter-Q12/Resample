@@ -48,17 +48,7 @@ func HanningFilter[T Number](zeros, density int) Option[T] {
 		}
 
 		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		for i := range interpWin {
-			interpWin[i] *= scale
-		}
-
-		interpDelta := getDifferences(interpWin)
-
-		r.filter = &windowFilter{
-			interpWin:   interpWin,
-			interpDelta: interpDelta,
-			density:     density,
-		}
+		r.filter = newWindowFilter(interpWin, density, scale)
 		return nil
 	}
 }
@@ -105,17 +95,25 @@ func newKaiserFilter(path string, density, length int, scale float64) (*windowFi
 		return nil, fmt.Errorf("read pre-build kaiser filter: %w", err)
 	}
 
-	for i := range interpWin {
+	return newWindowFilter(interpWin, density, scale), nil
+}
+
+func newWindowFilter(interpWin []float64, density int, scale float64) *windowFilter {
+	n := len(interpWin)
+	interpDelta := make([]float64, n)
+
+	for i := 0; i < n-1; i++ {
+		interpDelta[i] = (interpWin[i+1] - interpWin[i]) * scale
 		interpWin[i] *= scale
 	}
-
-	interpDelta := getDifferences(interpWin)
+	interpDelta[n-1] = 0
+	interpWin[n-1] *= scale
 
 	return &windowFilter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
 		density:     density,
-	}, nil
+	}
 }
 
 func getHanningWindow(zeros, density int) ([]float64, error) {
@@ -153,13 +151,4 @@ func elementwiseProd(a, b []float64) []float64 {
 		res[i] = a[i] * b[i]
 	}
 	return res
-}
-
-func getDifferences(values []float64) []float64 {
-	diffs := make([]float64, len(values))
-	for i := 0; i < len(values)-1; i++ {
-		diffs[i] = values[i+1] - values[i]
-	}
-	diffs[len(diffs)-1] = 0
-	return diffs
 }
