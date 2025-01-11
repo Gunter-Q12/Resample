@@ -103,6 +103,10 @@ func TestResamplerFloat(t *testing.T) {
 			input:  sine8000,
 			output: sine125,
 			err:    nil, ir: 8000, or: 125, filter: NewKaiserFastFilter()},
+		{name: "KaiserFast uplampling",
+			input:  sine125,
+			output: sine8000,
+			err:    nil, ir: 125, or: 8000, filter: NewKaiserFastFilter()},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
