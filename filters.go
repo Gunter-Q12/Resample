@@ -9,26 +9,28 @@ import (
 
 type option[T Number] func(*Resampler[T]) error
 
-func LinearFilter[T Number](resampler *Resampler[T]) error {
-	resampler.filter = &linearFilter{}
+func LinearFilter[T Number](r *Resampler[T]) error {
+	r.filter = &linearFilter{}
 	return nil
 }
 
-func KaiserFastFilter[T Number](resampler *Resampler[T]) error {
-	filter, err := newKaiserFilter("filters/kaiser_fast_f64", 512, 12289)
+func KaiserFastFilter[T Number](r *Resampler[T]) error {
+	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+	filter, err := newKaiserFilter("filters/kaiser_fast_f64", 512, 12289, scale)
 	if err != nil {
 		return fmt.Errorf("new kaiser fast filter: %w", err)
 	}
-	resampler.filter = filter
+	r.filter = filter
 	return nil
 }
 
-func KaiserBestFilter[T Number](resampler *Resampler[T]) error {
-	filter, err := newKaiserFilter("filters/kaiser_best_f64", 8192, 409601)
+func KaiserBestFilter[T Number](r *Resampler[T]) error {
+	scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+	filter, err := newKaiserFilter("filters/kaiser_best_f64", 8192, 409601, scale)
 	if err != nil {
 		return fmt.Errorf("new kaiser best filter: %w", err)
 	}
-	resampler.filter = filter
+	r.filter = filter
 	return nil
 }
 
@@ -74,7 +76,7 @@ func (k kaiserFilter) GetLength() int {
 	return len(k.interpWin)
 }
 
-func newKaiserFilter(path string, density, length int) (*kaiserFilter, error) {
+func newKaiserFilter(path string, density, length int, scale float64) (*kaiserFilter, error) {
 	interpWin := make([]float64, length)
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 	if err != nil {
@@ -83,6 +85,10 @@ func newKaiserFilter(path string, density, length int) (*kaiserFilter, error) {
 	err = binary.Read(file, binary.LittleEndian, interpWin)
 	if err != nil {
 		return nil, fmt.Errorf("read pre-build kaiser filter: %w", err)
+	}
+
+	for i := range interpWin {
+		interpWin[i] *= scale
 	}
 
 	interpDelta := getDifferences(interpWin)

@@ -155,7 +155,7 @@ func (r *Resampler[T]) resample(samples []T, timeOut []float64, scale float64, y
 			currFilter := int(float64(filterId) + step*float64(i))
 			currFrac := frac + step*float64(i) - float64(int(frac+step*float64(i)))
 
-			weight := scale * r.filter.GetValue(float64(currFilter)+currFrac)
+			weight := r.filter.GetValue(float64(currFilter) + currFrac)
 			newSample += weight * float64(samples[sampleId+i+1])
 			i += 1
 		}
