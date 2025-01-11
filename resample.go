@@ -41,8 +41,11 @@ func New[T Number](outBuffer io.Writer, inRate, outRate, ch int,
 	}
 
 	for _, option := range options {
-		option(resampler)
+		if err := option(resampler); err != nil {
+			return nil, err
+		}
 	}
+
 	return resampler, nil
 }
 
@@ -59,9 +62,9 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 
 	var output []T
 	switch t := r.filter.(type) {
-	case linearFilter:
+	case *linearFilter:
 		output, err = r.linear(samples)
-	case kaiserFilter:
+	case *kaiserFilter:
 		output, err = r.kaiserFast(samples)
 	default:
 		err = fmt.Errorf("custom filters are not supported: %v", t)

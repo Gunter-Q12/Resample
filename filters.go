@@ -2,22 +2,34 @@ package resample
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"os"
 )
 
-type option[T Number] func(*Resampler[T])
+type option[T Number] func(*Resampler[T]) error
 
-func LinearFilter[T Number](resampler *Resampler[T]) {
-	resampler.filter = linearFilter{}
+func LinearFilter[T Number](resampler *Resampler[T]) error {
+	resampler.filter = &linearFilter{}
+	return nil
 }
 
-func KaiserFastFilter[T Number](resampler *Resampler[T]) {
-	resampler.filter = newKaiserFilter("filters/kaiser_fast_f64", 512, 12289)
+func KaiserFastFilter[T Number](resampler *Resampler[T]) error {
+	filter, err := newKaiserFilter("filters/kaiser_fast_f64", 512, 12289)
+	if err != nil {
+		return fmt.Errorf("new kaiser fast filter: %w", err)
+	}
+	resampler.filter = filter
+	return nil
 }
 
-func KaiserBestFilter[T Number](resampler *Resampler[T]) {
-	resampler.filter = newKaiserFilter("filters/kaiser_best_f64", 8192, 409601)
+func KaiserBestFilter[T Number](resampler *Resampler[T]) error {
+	filter, err := newKaiserFilter("filters/kaiser_best_f64", 8192, 409601)
+	if err != nil {
+		return fmt.Errorf("new kaiser best filter: %w", err)
+	}
+	resampler.filter = filter
+	return nil
 }
 
 type Filter interface {
@@ -62,24 +74,24 @@ func (k kaiserFilter) GetLength() int {
 	return len(k.interpWin)
 }
 
-func newKaiserFilter(path string, density, length int) kaiserFilter {
+func newKaiserFilter(path string, density, length int) (*kaiserFilter, error) {
 	interpWin := make([]float64, length)
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("read pre-build kaiser filter: %w", err)
 	}
 	err = binary.Read(file, binary.LittleEndian, interpWin)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("read pre-build kaiser filter: %w", err)
 	}
 
 	interpDelta := getDifferences(interpWin)
 
-	return kaiserFilter{
+	return &kaiserFilter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
 		density:     density,
-	}
+	}, nil
 }
 
 func getSincWindow(zeros, density int) ([]float64, error) {
