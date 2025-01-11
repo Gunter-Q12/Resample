@@ -127,6 +127,7 @@ func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y
 		var newSample float64
 
 		timeRegister := timeOut[t]
+		offset := timeRegister - float64(int(timeRegister))
 
 		sampleId := int(timeRegister)
 		frac := scale * (timeRegister - float64(sampleId))
@@ -137,14 +138,12 @@ func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y
 		// computing left wing (because of the middle element)
 		i := 0
 		for sampleId-i >= 0 && int(float64(filterId)+step*float64(i)) < winLen {
-			currFilter := int(float64(filterId) + step*float64(i))
-			currFrac := frac + step*float64(i) - float64(int(frac+step*float64(i)))
-
-			weight := scale * r.filter.GetValue(float64(currFilter)+currFrac)
+			weight := r.filter.GetPoint(offset, i)
 			newSample += weight * float64(samples[sampleId-i])
 			i += 1
 		}
 
+		offset = 1 - offset
 		frac = scale * (1 - (timeRegister - float64(sampleId)))
 		filterId = int(frac * float64(r.filter.GetDensity()))
 		frac -= float64(filterId) * (1 / float64(r.filter.GetDensity()))
@@ -152,10 +151,7 @@ func (r *Resampler[T]) convolve(samples []T, timeOut []float64, scale float64, y
 		// computing right wing
 		i = 0
 		for (sampleId+i+1) < samplesLen && int(float64(filterId)+step*float64(i)) < winLen {
-			currFilter := int(float64(filterId) + step*float64(i))
-			currFrac := frac + step*float64(i) - float64(int(frac+step*float64(i)))
-
-			weight := r.filter.GetValue(float64(currFilter) + currFrac)
+			weight := r.filter.GetPoint(offset, i)
 			newSample += weight * float64(samples[sampleId+i+1])
 			i += 1
 		}
