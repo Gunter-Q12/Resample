@@ -47,25 +47,29 @@ type KaiserFastFilter struct {
 }
 
 func (k KaiserFastFilter) GetValue(position float64) float64 {
-	//TODO implement me
-	panic("implement me")
-	return 0
+	sample := int(position)
+	frac := position - float64(sample)
+
+	return k.interpWin[sample] + frac*k.interpDelta[sample]
 }
 
 func (k KaiserFastFilter) GetDensity() int {
-	//TODO implement me
-	panic("implement me")
-	return 0
+	return k.density
 }
 
 func (k KaiserFastFilter) GetLength() int {
-	//TODO implement me
-	panic("implement me")
-	return 0
+	return len(k.interpWin)
 }
 
 func NewKaiserFastFilter() KaiserFastFilter {
-	return KaiserFastFilter{}
+	density := 512
+	interpWin, _ := getSincWindow(24, density)
+	interpDelta := getDifferences(interpWin)
+	return KaiserFastFilter{
+		interpWin:   interpWin,
+		interpDelta: interpDelta,
+		density:     density,
+	}
 }
 
 type Resampler[T Number] struct {
