@@ -23,7 +23,8 @@ type Resampler[T Number] struct {
 	elemSize int
 }
 
-func New[T Number](outBuffer io.Writer, inRate, outRate, ch int, filter Filter) (*Resampler[T], error) {
+func New[T Number](outBuffer io.Writer, inRate, outRate, ch int,
+	options ...option[T]) (*Resampler[T], error) {
 	if inRate <= 0 || outRate <= 0 {
 		return nil, errors.New("sampling rates must be greater than zero")
 	}
@@ -31,14 +32,18 @@ func New[T Number](outBuffer io.Writer, inRate, outRate, ch int, filter Filter) 
 	var t T
 	elemSize := int(reflect.TypeOf(t).Size())
 
-	return &Resampler[T]{
+	resampler := &Resampler[T]{
 		outBuf:   outBuffer,
 		inRate:   inRate,
 		outRate:  outRate,
 		ch:       ch,
-		filter:   filter,
 		elemSize: elemSize,
-	}, nil
+	}
+
+	for _, option := range options {
+		option(resampler)
+	}
+	return resampler, nil
 }
 
 func (r *Resampler[T]) Write(input []byte) (int, error) {
@@ -54,9 +59,9 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 
 	var output []T
 	switch t := r.filter.(type) {
-	case LinearFilter:
+	case linearFilter:
 		output, err = r.linear(samples)
-	case KaiserFilter:
+	case kaiserFilter:
 		output, err = r.kaiserFast(samples)
 	default:
 		err = fmt.Errorf("custom filters are not supported: %v", t)

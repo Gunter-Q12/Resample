@@ -6,53 +6,63 @@ import (
 	"os"
 )
 
+type option[T Number] func(*Resampler[T])
+
+func LinearFilter[T Number](resampler *Resampler[T]) {
+	resampler.filter = linearFilter{}
+}
+
+func KaiserFastFilter[T Number](resampler *Resampler[T]) {
+	resampler.filter = newKaiserFilter("filters/kaiser_fast_f64", 512, 12289)
+}
+
+func KaiserBestFilter[T Number](resampler *Resampler[T]) {
+	resampler.filter = newKaiserFilter("filters/kaiser_best_f64", 8192, 409601)
+}
+
 type Filter interface {
 	GetValue(position float64) float64
 	GetDensity() int
 	GetLength() int
 }
 
-type LinearFilter struct {
+type linearFilter struct {
 }
 
-func (lr LinearFilter) GetValue(position float64) float64 {
+func (lr linearFilter) GetValue(position float64) float64 {
 	return max(0, 1-position)
 }
 
-func (lr LinearFilter) GetDensity() int {
+func (lr linearFilter) GetDensity() int {
 	return 1
 }
 
-func (lr LinearFilter) GetLength() int {
+func (lr linearFilter) GetLength() int {
 	return 2
 }
 
-func NewLinearFilter() LinearFilter {
-	return LinearFilter{}
-}
-
-type KaiserFilter struct {
+type kaiserFilter struct {
 	interpWin   []float64
 	interpDelta []float64
 	density     int
 }
 
-func (k KaiserFilter) GetValue(position float64) float64 {
+func (k kaiserFilter) GetValue(position float64) float64 {
 	sample := int(position)
 	frac := position - float64(sample)
 
 	return k.interpWin[sample] + frac*k.interpDelta[sample]
 }
 
-func (k KaiserFilter) GetDensity() int {
+func (k kaiserFilter) GetDensity() int {
 	return k.density
 }
 
-func (k KaiserFilter) GetLength() int {
+func (k kaiserFilter) GetLength() int {
 	return len(k.interpWin)
 }
 
-func newKaiserFilter(path string, density, length int) KaiserFilter {
+func newKaiserFilter(path string, density, length int) kaiserFilter {
 	interpWin := make([]float64, length)
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 	if err != nil {
@@ -65,19 +75,11 @@ func newKaiserFilter(path string, density, length int) KaiserFilter {
 
 	interpDelta := getDifferences(interpWin)
 
-	return KaiserFilter{
+	return kaiserFilter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
 		density:     density,
 	}
-}
-
-func NewKaiserFastFilter() KaiserFilter {
-	return newKaiserFilter("filters/kaiser_fast_f64", 512, 12289)
-}
-
-func NewKaiserBestFilter() KaiserFilter {
-	return newKaiserFilter("filters/kaiser_best_f64", 8192, 409601)
 }
 
 func getSincWindow(zeros, density int) ([]float64, error) {
