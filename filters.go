@@ -35,9 +35,6 @@ func KaiserBestFilter[T Number](r *Resampler[T]) error {
 }
 
 type Filter interface {
-	GetValue(position float64) float64
-	GetDensity() int
-	GetLength() int
 	GetPoint(offset float64, index int) (float64, error)
 }
 
@@ -46,19 +43,7 @@ type linearFilter struct {
 
 func (lr linearFilter) GetPoint(offset float64, index int) (float64, error) {
 	frac := offset + float64(index)
-	return lr.GetValue(frac), nil
-}
-
-func (lr linearFilter) GetValue(position float64) float64 {
-	return max(0, 1-position)
-}
-
-func (lr linearFilter) GetDensity() int {
-	return 1
-}
-
-func (lr linearFilter) GetLength() int {
-	return 2
+	return max(0, 1-frac), nil
 }
 
 type kaiserFilter struct {
@@ -78,21 +63,6 @@ func (k kaiserFilter) GetPoint(offset float64, index int) (float64, error) {
 
 	weight := k.interpWin[sampleId] + frac*k.interpDelta[sampleId]
 	return weight, nil
-}
-
-func (k kaiserFilter) GetValue(position float64) float64 {
-	sample := int(position)
-	frac := position - float64(sample)
-
-	return k.interpWin[sample] + frac*k.interpDelta[sample]
-}
-
-func (k kaiserFilter) GetDensity() int {
-	return k.density
-}
-
-func (k kaiserFilter) GetLength() int {
-	return len(k.interpWin)
 }
 
 func newKaiserFilter(path string, density, length int, scale float64) (*kaiserFilter, error) {
