@@ -42,13 +42,12 @@ func KaiserBestFilter[T Number]() Option[T] {
 
 func HanningFilter[T Number](zeros, density int) Option[T] {
 	return func(r *Resampler[T]) error {
-		interpWin, err := getHanningWindow(zeros, density)
-		if err != nil {
-			return err
-		}
-
 		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.filter = newWindowFilter(interpWin, density, scale)
+		filter, err := newHanningFilter(zeros, density, scale)
+		if err != nil {
+			return fmt.Errorf("new kaiser best filter: %w", err)
+		}
+		r.filter = filter
 		return nil
 	}
 }
@@ -116,7 +115,12 @@ func newWindowFilter(interpWin []float64, density int, scale float64) *windowFil
 	}
 }
 
-func getHanningWindow(zeros, density int) ([]float64, error) {
+func newHanningFilter(zeros, density int, scale float64) (*windowFilter, error) {
+	interpWin := newHanningWindow(zeros, density)
+	return newWindowFilter(interpWin, density, scale), nil
+}
+
+func newHanningWindow(zeros, density int) []float64 {
 	n := density * zeros
 	sincWin := make([]float64, n+1)
 	step := float64(zeros) / float64(n+1)
@@ -125,9 +129,7 @@ func getHanningWindow(zeros, density int) ([]float64, error) {
 	}
 
 	taper := hanning(2*n + 1)[n:]
-
-	interpWin := elementwiseProd(taper, sincWin)
-	return interpWin, nil
+	return elementwiseProd(taper, sincWin)
 }
 
 func sinc(x float64) float64 {

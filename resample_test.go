@@ -146,8 +146,7 @@ func TestGetSincWindow(t *testing.T) {
 
 	file, err := os.OpenFile(path+"want", os.O_RDONLY, 0666)
 	if errors.Is(err, os.ErrNotExist) {
-		want, err := getHanningWindow(zeros, density)
-		assert.NoError(t, err)
+		want := newHanningWindow(zeros, density)
 		toFile(t, want, path+"got")
 		t.Fatalf("Check saved results.\nRename file form *_got to *_want\nRun the test again")
 	} else if err != nil {
@@ -155,8 +154,7 @@ func TestGetSincWindow(t *testing.T) {
 	}
 	want := readBuff[float64](t, file, zeros*density+1)
 
-	got, err := getHanningWindow(zeros, density)
-	assert.NoError(t, err)
+	got := newHanningWindow(zeros, density)
 
 	toFile(t, got, path+"got")
 	assert.Lenf(t, got, len(want), "want: %d, got: %d", len(want), len(got))
