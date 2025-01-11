@@ -38,15 +38,15 @@ type Filter interface {
 	GetValue(position float64) float64
 	GetDensity() int
 	GetLength() int
-	GetPoint(offset float64, index int) float64
+	GetPoint(offset float64, index int) (float64, error)
 }
 
 type linearFilter struct {
 }
 
-func (lr linearFilter) GetPoint(offset float64, index int) float64 {
+func (lr linearFilter) GetPoint(offset float64, index int) (float64, error) {
 	frac := offset + float64(index)
-	return lr.GetValue(frac)
+	return lr.GetValue(frac), nil
 }
 
 func (lr linearFilter) GetValue(position float64) float64 {
@@ -68,13 +68,16 @@ type kaiserFilter struct {
 	scale       float64
 }
 
-func (k kaiserFilter) GetPoint(offset float64, index int) float64 {
-	frac := (offset + float64(index)) * k.scale
-	sampleId := frac * float64(k.density)
-	frac -= sampleId
+func (k kaiserFilter) GetPoint(offset float64, index int) (float64, error) {
+	integer, frac := math.Modf((offset + float64(index)) * k.scale)
+	sampleId := int(integer * float64(k.density))
 
-	weight := k.interpWin[int(sampleId)] + frac*k.interpDelta[int(sampleId)]
-	return weight
+	if sampleId >= len(k.interpWin) {
+		return 0, fmt.Errorf("sampleId out of range: %d", sampleId)
+	}
+
+	weight := k.interpWin[sampleId] + frac*k.interpDelta[sampleId]
+	return weight, nil
 }
 
 func (k kaiserFilter) GetValue(position float64) float64 {
