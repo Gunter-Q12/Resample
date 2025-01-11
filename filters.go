@@ -46,14 +46,14 @@ func (lr linearFilter) GetPoint(offset float64, index int) (float64, error) {
 	return max(0, 1-frac), nil
 }
 
-type kaiserFilter struct {
+type windowFilter struct {
 	interpWin   []float64
 	interpDelta []float64
 	density     int
 	scale       float64
 }
 
-func (k kaiserFilter) GetPoint(offset float64, index int) (float64, error) {
+func (k windowFilter) GetPoint(offset float64, index int) (float64, error) {
 	integer, frac := math.Modf((offset + float64(index)) * k.scale)
 	sampleId := int(integer * float64(k.density))
 
@@ -65,7 +65,7 @@ func (k kaiserFilter) GetPoint(offset float64, index int) (float64, error) {
 	return weight, nil
 }
 
-func newKaiserFilter(path string, density, length int, scale float64) (*kaiserFilter, error) {
+func newKaiserFilter(path string, density, length int, scale float64) (*windowFilter, error) {
 	interpWin := make([]float64, length)
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 	if err != nil {
@@ -82,7 +82,7 @@ func newKaiserFilter(path string, density, length int, scale float64) (*kaiserFi
 
 	interpDelta := getDifferences(interpWin)
 
-	return &kaiserFilter{
+	return &windowFilter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
 		density:     density,

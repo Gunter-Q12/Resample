@@ -84,13 +84,11 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 
 func (r *Resampler[T]) convolve(samples []T, timeOut []float64, y *[]T) {
 	samplesLen := len(samples)
-
 	for t := range *y {
 		var newSample float64
 
 		timeRegister := timeOut[t]
 		offset := timeRegister - float64(int(timeRegister))
-
 		sampleId := int(timeRegister)
 
 		// computing left wing (because of the middle element)
