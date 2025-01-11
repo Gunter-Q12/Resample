@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestResampler(t *testing.T) {
+func TestResamplerInt(t *testing.T) {
 	ch := 1
 
 	resamplerTestInt16 := []struct {
@@ -54,6 +54,22 @@ func TestResampler(t *testing.T) {
 		})
 	}
 
+	t.Run("io.Copy", func(t *testing.T) {
+		inBuf := writeBuff(t, []int16{1, 2, 3})
+		outBuf := new(bytes.Buffer)
+
+		res, err := New[int16](outBuf, 1, 2, ch, NewLinearFilter())
+		assert.NoError(t, err)
+
+		size, err := io.Copy(res, inBuf)
+		assert.NoError(t, err)
+		assert.EqualValues(t, 6, size)
+	})
+}
+
+func TestResamplerFloat(t *testing.T) {
+	ch := 1
+
 	file, err := os.Open("./testdata/sine_8000_3_f64_ch1")
 	if err != nil {
 		t.Fatal(err)
@@ -75,11 +91,11 @@ func TestResampler(t *testing.T) {
 		or     int
 		filter Filter
 	}{
-		{name: "real downsampling",
+		{name: "Linear downsampling",
 			input:  []float64{0, 0.25, 0.5, 0.75},
 			output: []float64{0, 1.0 / 3, 2.0 / 3},
 			err:    nil, ir: 4, or: 3, filter: NewLinearFilter()},
-		{name: "real upsampling",
+		{name: "Linear upsampling",
 			input:  []float64{1, 2, 3},
 			output: []float64{1, 1.5, 2, 2.5, 3},
 			err:    nil, ir: 2, or: 4, filter: NewLinearFilter()},
@@ -106,20 +122,7 @@ func TestResampler(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("io.Copy", func(t *testing.T) {
-		inBuf := writeBuff(t, []int16{1, 2, 3})
-		outBuf := new(bytes.Buffer)
-
-		res, err := New[int16](outBuf, 1, 2, ch, NewLinearFilter())
-		assert.NoError(t, err)
-
-		size, err := io.Copy(res, inBuf)
-		assert.NoError(t, err)
-		assert.EqualValues(t, 6, size)
-	})
 }
-
 func TestGetSincWindow(t *testing.T) {
 	path := "./testdata/sinc_window_"
 	zeros := 16
