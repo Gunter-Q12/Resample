@@ -1,6 +1,10 @@
 package resample
 
-import "math"
+import (
+	"encoding/binary"
+	"math"
+	"os"
+)
 
 type Filter interface {
 	GetValue(position float64) float64
@@ -50,8 +54,19 @@ func (k KaiserFastFilter) GetLength() int {
 
 func NewKaiserFastFilter() KaiserFastFilter {
 	density := 512
-	interpWin, _ := getSincWindow(24, density)
+	length := 12289
+	interpWin := make([]float64, length)
+	file, err := os.OpenFile("filters/kaiser_fast_f64", os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		panic(err)
+	}
+	err = binary.Read(file, binary.LittleEndian, interpWin)
+	if err != nil {
+		panic(err)
+	}
+
 	interpDelta := getDifferences(interpWin)
+
 	return KaiserFastFilter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
