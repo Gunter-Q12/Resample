@@ -17,14 +17,13 @@ class Sine:
                 self.amplitude *
                 np.sin(2 * np.pi * self.frequency * time / sample_rate + self.theta)
         )
-        if quantize is None:
+        if self.quant_bits is None:
             return sine_wave
         return quantize(sine_wave, self.quant_bits)
 
-    def get_time(self, sample_rate, sample_num):
-        return np.linspace(0, (sample_num-1) / sample_rate, sample_num)
 
-
+def get_time(self, sample_rate, sample_num):
+    return np.linspace(0, (sample_num-1) / sample_rate, sample_num)
 
 
 def quantize(wave, bits=16):
@@ -36,12 +35,14 @@ def quantize(wave, bits=16):
     return np.round(wave)
 
 
-def save(wave, path, bits=16):
+def save(wave, path, bits=None):
     match bits:
         case 16:
             data = wave.astype(np.int16)
         case 32:
             data = wave.astype(np.int32)
+        case None:
+            data = wave.astype(np.float64)
         case _:
             raise RuntimeError("Only 16 and 32 bit inegers are supported")
     data.tofile(path)
