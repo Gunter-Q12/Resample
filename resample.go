@@ -64,15 +64,11 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 		return 0, errors.New("input should have at least two samples")
 	}
 
-	timeIncrement := float64(r.inRate) / float64(r.outRate)
 	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
-	timeOut := make([]float64, shape)
-	for i := range timeOut {
-		timeOut[i] = float64(i) * timeIncrement
-	}
-
 	y := make([]T, shape)
-	r.convolve(samples, timeOut, &y)
+
+	timeIncrement := float64(r.inRate) / float64(r.outRate)
+	r.convolve(samples, timeIncrement, &y)
 
 	err = binary.Write(r.outBuf, binary.LittleEndian, y)
 	if err != nil {
@@ -81,12 +77,12 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	return len(input), nil
 }
 
-func (r *Resampler[T]) convolve(samples []T, timeOut []float64, y *[]T) {
+func (r *Resampler[T]) convolve(samples []T, timeIncrement float64, y *[]T) {
 	samplesLen := len(samples)
 	for t := range *y {
 		var newSample float64
 
-		timeRegister := timeOut[t]
+		timeRegister := float64(t) * timeIncrement
 		offset := timeRegister - float64(int(timeRegister))
 		sampleId := int(timeRegister)
 
