@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"resample/pkg/resample"
+	"resample"
 	"strings"
 )
 
