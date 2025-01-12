@@ -1,10 +1,10 @@
 package resample
 
 import (
+	"embed"
 	"encoding/binary"
 	"fmt"
 	"math"
-	"os"
 )
 
 type Option[T Number] func(*Resampler[T]) error
@@ -93,10 +93,13 @@ func newFilter(interpWin []float64, density int, scale float64) *filter {
 	}
 }
 
+//go:embed filters
+var filtersDir embed.FS
+
 func readWindowFromFile(path string, length int) ([]float64, error) {
 	op := "read filter from file"
 
-	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+	file, err := filtersDir.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
