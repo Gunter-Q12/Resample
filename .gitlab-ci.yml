@@ -15,5 +15,11 @@ test:
     expire_in: 1 hour
   coverage: "/\\(statements\\)\\s+\\d+.?\\d+%/"
   rules:
-    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"
+    - if:
+        ($CI_PIPELINE_SOURCE == "merge_request_event" &&
+        $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main")
+        ||
+        ($CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main")
+      changes: 
+        - ".gitlab-ci.yml"
+        - "**/*.go"
