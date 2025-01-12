@@ -14,7 +14,7 @@ import (
 const wavHeader = 44
 
 var (
-	format = flag.String("format", "i16", "PCM format")
+	format = flag.String("format", "f64", "PCM format")
 	ch     = flag.Int("ch", 2, "Number of channels")
 	ir     = flag.Int("ir", 44100, "Input sample rate")
 	or     = flag.Int("or", 0, "Output sample rate")
