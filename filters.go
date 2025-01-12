@@ -18,36 +18,39 @@ func LinearFilter[T Number]() Option[T] {
 
 func KaiserFastFilter[T Number]() Option[T] {
 	return func(r *Resampler[T]) error {
-		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		filter, err := newKaiserFilter("filters/kaiser_fast_f64", 512, 12289, scale)
+		interpWin, err := readWindowFromFile("filters/kaiser_fast_f64", 12289)
 		if err != nil {
-			return fmt.Errorf("new kaiser fast filter: %w", err)
+			return fmt.Errorf("new kaiser best filter: %w", err)
 		}
-		r.filter = filter
+
+		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+		r.filter = newWindowFilter(interpWin, 512, scale)
+
 		return nil
 	}
 }
 
 func KaiserBestFilter[T Number]() Option[T] {
 	return func(r *Resampler[T]) error {
-		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		filter, err := newKaiserFilter("filters/kaiser_best_f64", 8192, 409601, scale)
+		interpWin, err := readWindowFromFile("filters/kaiser_best_f64", 409601)
 		if err != nil {
 			return fmt.Errorf("new kaiser best filter: %w", err)
 		}
-		r.filter = filter
+
+		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+		r.filter = newWindowFilter(interpWin, 8192, scale)
+
 		return nil
 	}
 }
 
 func HanningFilter[T Number](zeros, density int) Option[T] {
 	return func(r *Resampler[T]) error {
+		interpWin := newHanningWindow(zeros, density)
+
 		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		filter, err := newHanningFilter(zeros, density, scale)
-		if err != nil {
-			return fmt.Errorf("new kaiser best filter: %w", err)
-		}
-		r.filter = filter
+		r.filter = newWindowFilter(interpWin, density, scale)
+
 		return nil
 	}
 }
@@ -83,18 +86,21 @@ func (k windowFilter) GetPoint(offset float64, index int) (float64, error) {
 	return weight, nil
 }
 
-func newKaiserFilter(path string, density, length int, scale float64) (*windowFilter, error) {
-	interpWin := make([]float64, length)
+func readWindowFromFile(path string, length int) ([]float64, error) {
+	op := "read filter from file"
+
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 	if err != nil {
-		return nil, fmt.Errorf("read pre-build kaiser filter: %w", err)
-	}
-	err = binary.Read(file, binary.LittleEndian, interpWin)
-	if err != nil {
-		return nil, fmt.Errorf("read pre-build kaiser filter: %w", err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return newWindowFilter(interpWin, density, scale), nil
+	interpWin := make([]float64, length)
+	err = binary.Read(file, binary.LittleEndian, interpWin)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return interpWin, nil
 }
 
 func newWindowFilter(interpWin []float64, density int, scale float64) *windowFilter {
@@ -113,11 +119,6 @@ func newWindowFilter(interpWin []float64, density int, scale float64) *windowFil
 		interpDelta: interpDelta,
 		density:     density,
 	}
-}
-
-func newHanningFilter(zeros, density int, scale float64) (*windowFilter, error) {
-	interpWin := newHanningWindow(zeros, density)
-	return newWindowFilter(interpWin, density, scale), nil
 }
 
 func newHanningWindow(zeros, density int) []float64 {
