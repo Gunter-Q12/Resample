@@ -22,7 +22,7 @@ class Sine:
         return quantize(sine_wave, self.quant_bits)
 
 
-def get_time(self, sample_rate, sample_num):
+def get_time(sample_rate, sample_num):
     return np.linspace(0, (sample_num-1) / sample_rate, sample_num)
 
 
