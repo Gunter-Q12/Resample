@@ -74,23 +74,6 @@ func (k filter) GetPoint(offset float64, index int) (float64, error) {
 	return weight, nil
 }
 
-func readWindowFromFile(path string, length int) ([]float64, error) {
-	op := "read filter from file"
-
-	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
-	interpWin := make([]float64, length)
-	err = binary.Read(file, binary.LittleEndian, interpWin)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
-	return interpWin, nil
-}
-
 func newFilter(interpWin []float64, density int, scale float64) *filter {
 	n := len(interpWin)
 	interpDelta := make([]float64, n)
@@ -108,6 +91,23 @@ func newFilter(interpWin []float64, density int, scale float64) *filter {
 		density:     density,
 		scale:       scale,
 	}
+}
+
+func readWindowFromFile(path string, length int) ([]float64, error) {
+	op := "read filter from file"
+
+	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	interpWin := make([]float64, length)
+	err = binary.Read(file, binary.LittleEndian, interpWin)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return interpWin, nil
 }
 
 func newHanningWindow(zeros, density int) []float64 {

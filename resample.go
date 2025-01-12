@@ -72,7 +72,6 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	}
 
 	y := make([]T, shape)
-
 	r.convolve(samples, timeOut, &y)
 
 	err = binary.Write(r.outBuf, binary.LittleEndian, y)
