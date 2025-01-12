@@ -11,7 +11,7 @@ type Option[T Number] func(*Resampler[T]) error
 
 func LinearFilter[T Number]() Option[T] {
 	return func(r *Resampler[T]) error {
-		r.filter = &linearFilter{}
+		r.filter = newWindowFilter([]float64{1, 0}, 1, 1)
 		return nil
 	}
 }
@@ -57,14 +57,6 @@ func HanningFilter[T Number](zeros, density int) Option[T] {
 
 type Filter interface {
 	GetPoint(offset float64, index int) (float64, error)
-}
-
-type linearFilter struct {
-}
-
-func (lr linearFilter) GetPoint(offset float64, index int) (float64, error) {
-	frac := offset + float64(index)
-	return max(0, 1-frac), nil
 }
 
 type windowFilter struct {
@@ -118,6 +110,7 @@ func newWindowFilter(interpWin []float64, density int, scale float64) *windowFil
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
 		density:     density,
+		scale:       scale,
 	}
 }
 
