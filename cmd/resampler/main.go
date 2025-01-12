@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"gitlab.com/gunter-go/resample"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
-	"resample"
 	"strings"
 )
 
