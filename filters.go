@@ -11,7 +11,7 @@ type Option[T Number] func(*Resampler[T]) error
 
 func LinearFilter[T Number]() Option[T] {
 	return func(r *Resampler[T]) error {
-		r.filter = newWindowFilter([]float64{1, 0}, 1, 1)
+		r.f = newFilter([]float64{1, 0}, 1, 1)
 		return nil
 	}
 }
@@ -24,7 +24,7 @@ func KaiserFastFilter[T Number]() Option[T] {
 		}
 
 		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.filter = newWindowFilter(interpWin, 512, scale)
+		r.f = newFilter(interpWin, 512, scale)
 
 		return nil
 	}
@@ -38,7 +38,7 @@ func KaiserBestFilter[T Number]() Option[T] {
 		}
 
 		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.filter = newWindowFilter(interpWin, 8192, scale)
+		r.f = newFilter(interpWin, 8192, scale)
 
 		return nil
 	}
@@ -49,24 +49,20 @@ func HanningFilter[T Number](zeros, density int) Option[T] {
 		interpWin := newHanningWindow(zeros, density)
 
 		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.filter = newWindowFilter(interpWin, density, scale)
+		r.f = newFilter(interpWin, density, scale)
 
 		return nil
 	}
 }
 
-type Filter interface {
-	GetPoint(offset float64, index int) (float64, error)
-}
-
-type windowFilter struct {
+type filter struct {
 	interpWin   []float64
 	interpDelta []float64
 	density     int
 	scale       float64
 }
 
-func (k windowFilter) GetPoint(offset float64, index int) (float64, error) {
+func (k filter) GetPoint(offset float64, index int) (float64, error) {
 	integer, frac := math.Modf((offset + float64(index)) * k.scale)
 	sampleId := int(integer * float64(k.density))
 
@@ -95,7 +91,7 @@ func readWindowFromFile(path string, length int) ([]float64, error) {
 	return interpWin, nil
 }
 
-func newWindowFilter(interpWin []float64, density int, scale float64) *windowFilter {
+func newFilter(interpWin []float64, density int, scale float64) *filter {
 	n := len(interpWin)
 	interpDelta := make([]float64, n)
 
@@ -106,7 +102,7 @@ func newWindowFilter(interpWin []float64, density int, scale float64) *windowFil
 	interpDelta[n-1] = 0
 	interpWin[n-1] *= scale
 
-	return &windowFilter{
+	return &filter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
 		density:     density,

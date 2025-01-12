@@ -19,7 +19,7 @@ type Resampler[T Number] struct {
 	inRate   int
 	outRate  int
 	ch       int
-	filter   Filter
+	f        *filter
 	elemSize int
 }
 
@@ -93,22 +93,22 @@ func (r *Resampler[T]) convolve(samples []T, timeOut []float64, y *[]T) {
 
 		// computing left wing (because of the middle element)
 		i := 0
-		weight, err := r.filter.GetPoint(offset, i)
+		weight, err := r.f.GetPoint(offset, i)
 		for sampleId-i >= 0 && err == nil {
 			newSample += weight * float64(samples[sampleId-i])
 			i += 1
-			weight, err = r.filter.GetPoint(offset, i)
+			weight, err = r.f.GetPoint(offset, i)
 		}
 
 		offset = 1 - offset
 
 		// computing right wing
 		i = 0
-		weight, err = r.filter.GetPoint(offset, i)
+		weight, err = r.f.GetPoint(offset, i)
 		for (sampleId+i+1) < samplesLen && err == nil {
 			newSample += weight * float64(samples[sampleId+i+1])
 			i += 1
-			weight, err = r.filter.GetPoint(offset, i)
+			weight, err = r.f.GetPoint(offset, i)
 		}
 		(*y)[t] = T(newSample) // TODO: proper rounding
 	}
