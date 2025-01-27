@@ -46,6 +46,12 @@ func New[T Number](outBuffer io.Writer, inRate, outRate, ch int,
 		}
 	}
 
+	if resampler.f == nil {
+		if err := KaiserBestFilter[T]()(resampler); err != nil {
+			return nil, err
+		}
+	}
+
 	return resampler, nil
 }
 
