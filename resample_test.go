@@ -11,8 +11,6 @@ import (
 )
 
 func TestResamplerInt(t *testing.T) {
-	ch := 1
-
 	resamplerTestInt16 := []struct {
 		name   string
 		input  []int16
@@ -20,27 +18,32 @@ func TestResamplerInt(t *testing.T) {
 		err    error
 		ir     int
 		or     int
+		ch     int
 		filter Option[int16]
 	}{
 		{name: "in=out",
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
-			err: nil, ir: 1, or: 1, filter: LinearFilter[int16]()},
+			err: nil, ir: 1, or: 1, ch: 1, filter: LinearFilter[int16]()},
 		{name: "not enough samples",
 			input: []int16{1},
-			err:   errors.New(""), ir: 1, or: 2, filter: LinearFilter[int16]()},
+			err:   errors.New(""), ir: 1, or: 2, ch: 1, filter: LinearFilter[int16]()},
 		{name: "simplest upsampling case",
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
-			err: nil, ir: 1, or: 2, filter: LinearFilter[int16]()},
+			err: nil, ir: 1, or: 2, ch: 1, filter: LinearFilter[int16]()},
 		{name: "simplest downsampling case",
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
-			err: nil, ir: 2, or: 1, filter: LinearFilter[int16]()},
+			err: nil, ir: 2, or: 1, ch: 1, filter: LinearFilter[int16]()},
+		{name: "two channels",
+			input:  []int16{1, 11, 3, 13, 5, 15},
+			output: []int16{1, 11, 2, 12, 3, 13, 4, 14, 5, 15},
+			err:    nil, ir: 1, or: 2, ch: 2, filter: LinearFilter[int16]()},
 	}
 	for _, tt := range resamplerTestInt16 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := writeBuff(t, tt.input)
 
-			res, err := New[int16](outBuf, tt.ir, tt.or, ch, tt.filter)
+			res, err := New[int16](outBuf, tt.ir, tt.or, tt.ch, tt.filter)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -58,7 +61,7 @@ func TestResamplerInt(t *testing.T) {
 		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
 
-		res, err := New[int16](outBuf, 1, 2, ch, LinearFilter[int16]())
+		res, err := New[int16](outBuf, 1, 2, 1, LinearFilter[int16]())
 		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)

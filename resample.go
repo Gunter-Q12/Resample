@@ -60,17 +60,29 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
 
-	if len(samples) < 2 {
+	n := len(samples) / r.ch
+
+	if n < 2 {
 		return 0, errors.New("input should have at least two samples")
 	}
 
-	shape := int(float64(len(samples)) * float64(r.outRate) / float64(r.inRate))
-	y := make([]T, shape)
+	shape := int(float64(n) * float64(r.outRate) / float64(r.inRate))
+	result := make([]T, shape*r.ch)
 
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
-	r.convolve(samples, timeIncrement, &y)
+	for i := 0; i < r.ch; i++ {
+		y := make([]T, shape)
+		channel := make([]T, n)
+		for j := 0; j < n; j++ {
+			channel[j] = samples[j*r.ch+i]
+		}
+		r.convolve(channel, timeIncrement, &y)
+		for j := 0; j < shape; j++ {
+			result[j*r.ch+i] = y[j]
+		}
+	}
 
-	err = binary.Write(r.outBuf, binary.LittleEndian, y)
+	err = binary.Write(r.outBuf, binary.LittleEndian, result)
 	if err != nil {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
