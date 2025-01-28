@@ -62,16 +62,17 @@ type filter struct {
 	scale       float64
 }
 
-func (k filter) GetPoint(offset float64, index int) (float64, error) {
+func (k filter) GetLength(offset float64) int {
+	return int(
+		(float64(len(k.interpWin)) - offset*k.scale*float64(k.density)) / k.scale / float64(k.density))
+}
+
+func (k filter) GetPoint(offset float64, index int) float64 {
 	integer, frac := math.Modf((offset + float64(index)) * k.scale)
 	sampleId := int(integer * float64(k.density))
 
-	if sampleId >= len(k.interpWin) {
-		return 0, fmt.Errorf("sampleId out of range: %d", sampleId)
-	}
-
 	weight := k.interpWin[sampleId] + frac*k.interpDelta[sampleId]
-	return weight, nil
+	return weight
 }
 
 func newFilter(interpWin []float64, density int, scale float64) *filter {

@@ -106,22 +106,22 @@ func (r *Resampler[T]) convolve(samples []T, timeIncrement float64, y *[]T) {
 
 		// computing left wing (because of the middle element)
 		i := 0
-		weight, err := r.f.GetPoint(offset, i)
-		for sampleId-i >= 0 && err == nil {
+		length := r.f.GetLength(offset)
+		for sampleId-i >= 0 && i < length {
+			weight := r.f.GetPoint(offset, i)
 			newSample += weight * float64(samples[sampleId-i])
 			i += 1
-			weight, err = r.f.GetPoint(offset, i)
 		}
 
 		offset = 1 - offset
 
 		// computing right wing
 		i = 0
-		weight, err = r.f.GetPoint(offset, i)
-		for (sampleId+i+1) < samplesLen && err == nil {
+		length = r.f.GetLength(offset)
+		for (sampleId+i+1) < samplesLen && i < length {
+			weight := r.f.GetPoint(offset, i)
 			newSample += weight * float64(samples[sampleId+i+1])
 			i += 1
-			weight, err = r.f.GetPoint(offset, i)
 		}
 		(*y)[t] = T(newSample) // TODO: proper rounding
 	}
