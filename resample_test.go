@@ -178,6 +178,24 @@ func FuzzResampler(f *testing.F) {
 	})
 }
 
+func BenchmarkWrite(b *testing.B) {
+	r, err := New[float64](io.Discard, 8000, 44000, 2)
+	assert.NoError(b, err)
+
+	file, err := os.Open("./testdata/bench_samples.raw")
+	if err != nil {
+		b.Fatal(err)
+	}
+	samples, err := io.ReadAll(file)
+	assert.NoError(b, err)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := r.Write(samples)
+		assert.NoError(b, err)
+	}
+}
+
 func toFile(t *testing.T, values any, path string) {
 	t.Helper()
 
@@ -193,7 +211,7 @@ func toFile(t *testing.T, values any, path string) {
 	}
 }
 
-func writeBuff(t *testing.T, values any) *bytes.Buffer {
+func writeBuff(t testing.TB, values any) *bytes.Buffer {
 	inBuf := new(bytes.Buffer)
 	err := binary.Write(inBuf, binary.LittleEndian, values)
 	if err != nil {
@@ -202,7 +220,7 @@ func writeBuff(t *testing.T, values any) *bytes.Buffer {
 	return inBuf
 }
 
-func readBuff[T any](t *testing.T, buff io.Reader, len int) []T {
+func readBuff[T any](t testing.TB, buff io.Reader, len int) []T {
 	output := make([]T, len)
 
 	err := binary.Read(buff, binary.LittleEndian, output)
