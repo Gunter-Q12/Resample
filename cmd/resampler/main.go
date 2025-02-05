@@ -7,8 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
 const wavHeader = 44
@@ -30,16 +28,11 @@ func main() {
 	inputPath := flag.Arg(0)
 	outputPath := flag.Arg(1)
 
-	input, err := getInputData(inputPath)
+	input, output, err := getInOutFiles(inputPath, outputPath, *or)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer input.Close()
-
-	output, err := os.Create(outputPath)
-	if err != nil {
-		log.Fatalln(err)
-	}
 	defer output.Close()
 
 	var res io.Writer
@@ -67,20 +60,6 @@ func main() {
 		os.Remove(outputPath)
 		log.Fatalln(err)
 	}
-}
-
-func getInputData(path string) (io.ReadCloser, error) {
-	input, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
-	// Skip WAV file header in order to pass only the PCM data to the Resampler
-	if strings.ToLower(filepath.Ext(path)) == ".wav" {
-		input.Seek(wavHeader, 0)
-	}
-
-	return input, nil
 }
 
 func getResampler[T resample.Number](output io.Writer, inRate, outRate int, ch int, q string) (*resample.Resampler[T], error) {
