@@ -12,18 +12,16 @@ import (
 const wavHeader = 44
 
 var (
-	format = flag.String("format", "f64", "PCM format")
-	ch     = flag.Int("ch", 2, "Number of channels")
-	ir     = flag.Int("ir", 44100, "Input sample rate")
+	format = flag.String("format", "", "PCM format")
+	ch     = flag.Int("ch", 0, "Number of channels")
+	ir     = flag.Int("ir", 0, "Input sample rate")
 	or     = flag.Int("or", 0, "Output sample rate")
 	q      = flag.String("q", "kaiser_fast", "Output quality")
 )
 
 func main() {
 	flag.Parse()
-	if flag.NArg() < 2 {
-		log.Fatalln("No input or output files given")
-	}
+	validateArgs()
 
 	inputPath := flag.Arg(0)
 	outputPath := flag.Arg(1)
@@ -59,6 +57,21 @@ func main() {
 	if err != nil {
 		os.Remove(outputPath)
 		log.Fatalln(err)
+	}
+}
+
+func validateArgs() {
+	if flag.NArg() < 2 {
+		log.Fatalln("No input or output files given")
+	}
+	if *ch <= 0 {
+		log.Fatalln("Specif correct number of channels")
+	}
+	if *ir <= 0 {
+		log.Fatalln("Specif correct input sample rate")
+	}
+	if *or <= 0 {
+		log.Fatalln("Specif correct ouput sample rate")
 	}
 }
 
