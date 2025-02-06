@@ -7,44 +7,72 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
-const wavHeader = 44
+const wavHeaderSize = 44
 
 var (
-	format = flag.String("format", "", "PCM format")
+	format = flag.String("format", "", "PCM format: i16, i32, i64, f32, f64")
 	ch     = flag.Int("ch", 0, "Number of channels")
-	ir     = flag.Int("ir", 0, "Input sample rate")
-	or     = flag.Int("or", 0, "Output sample rate")
-	q      = flag.String("q", "kaiser_fast", "Output quality")
+	ir     = flag.Int("ir", 0, "Input sample rate in Hz")
+	or     = flag.Int("or", 0, "Output sample rate in Hz")
+	q      = flag.String("q", "kaiser_fast",
+		"Output quality: linear, kaiser_fast, kaiser_best")
 )
 
 func main() {
 	flag.Parse()
-	validateArgs()
 
+	if flag.NArg() < 2 {
+		log.Fatalln("No input or output files given")
+	}
 	inputPath := flag.Arg(0)
 	outputPath := flag.Arg(1)
 
-	input, output, err := getInOutFiles(inputPath, outputPath, *or)
+	in, err := os.Open(inputPath)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
-	defer input.Close()
-	defer output.Close()
+	defer in.Close()
+
+	if strings.ToLower(filepath.Ext(inputPath)) == ".wav" {
+		*ir, *ch, *format, err = readHeader(in)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("parameters are overwritten with .WAV file header: -ir %d -ch %d -f %s",
+			*ir, *ch, *format)
+	}
+
+	out, err := os.Create(outputPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
+
+	if strings.ToLower(filepath.Ext(outputPath)) == ".wav" {
+		out.Seek(wavHeaderSize, io.SeekStart)
+		defer func(f *os.File, rate, ch int, format string) {
+			f.Seek(0, io.SeekStart)
+			writeHeader(f, rate, ch, format)
+		}(out, *or, *ch, *format)
+	}
+	validateArgs()
 
 	var res io.Writer
 	switch *format {
 	case "i16":
-		res, err = getResampler[int16](output, *ir, *or, *ch, *q)
+		res, err = getResampler[int16](out, *ir, *or, *ch, *q)
 	case "i32":
-		res, err = getResampler[int32](output, *ir, *or, *ch, *q)
+		res, err = getResampler[int32](out, *ir, *or, *ch, *q)
 	case "i64":
-		res, err = getResampler[int64](output, *ir, *or, *ch, *q)
+		res, err = getResampler[int64](out, *ir, *or, *ch, *q)
 	case "f32":
-		res, err = getResampler[float32](output, *ir, *or, *ch, *q)
+		res, err = getResampler[float32](out, *ir, *or, *ch, *q)
 	case "f64":
-		res, err = getResampler[float64](output, *ir, *or, *ch, *q)
+		res, err = getResampler[float64](out, *ir, *or, *ch, *q)
 	default:
 		err = fmt.Errorf("unsupported format: %s", *format)
 	}
@@ -53,7 +81,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	_, err = io.Copy(res, input)
+	_, err = io.Copy(res, in)
 	if err != nil {
 		os.Remove(outputPath)
 		log.Fatalln(err)
@@ -61,9 +89,6 @@ func main() {
 }
 
 func validateArgs() {
-	if flag.NArg() < 2 {
-		log.Fatalln("No input or output files given")
-	}
 	if *ch <= 0 {
 		log.Fatalln("Specif correct number of channels")
 	}

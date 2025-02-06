@@ -2,86 +2,88 @@ package main
 
 import (
 	"encoding/binary"
-	"io"
+	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
+	"strconv"
 )
 
-type waveFile struct {
-	file   *os.File
-	header []byte
+type wavHeader struct {
+	FileTypeBlockId [4]byte
+	FileSize        uint32
+	FileFormatId    [4]byte
 
-	outRate int
+	FormatBlockId [4]byte
+	BlockSize     uint32
+	AudioFormat   uint16
+	NbrChannels   uint16
+	Frequency     uint32
+	BytePerSec    uint32
+	BytePerBlock  uint16
+	BitsPerSample uint16
+
+	DataBlockId [4]byte
+	DataSize    uint32
 }
 
-func (wf *waveFile) Write(p []byte) (n int, err error) {
-	return wf.file.Write(p)
+var defaultHeader = wavHeader{
+	FileTypeBlockId: [4]byte{'R', 'I', 'F', 'F'},
+	FileFormatId:    [4]byte{'W', 'A', 'V', 'E'},
+	FormatBlockId:   [4]byte{'f', 'm', 't', ' '},
+	DataBlockId:     [4]byte{'d', 'a', 't', 'a'},
+	BlockSize:       16, // 18 and 40-bit headers are not supported
 }
 
-func (wf *waveFile) Close() error {
-	defer wf.file.Close()
+func readHeader(f *os.File) (rate, ch int, format string, err error) {
+	var header wavHeader
+	if err := binary.Read(f, binary.LittleEndian, &header); err != nil {
+		return 0, 0, "", err
+	}
 
-	info, err := wf.file.Stat()
+	rate = int(header.Frequency)
+	ch = int(header.NbrChannels)
+	bitsPerSample := strconv.Itoa(int(header.BitsPerSample))
+
+	if header.AudioFormat == 1 {
+		return rate, ch, "i" + bitsPerSample, nil
+	}
+	if header.AudioFormat == 3 {
+		return rate, ch, "f" + bitsPerSample, nil
+	}
+
+	return
+}
+
+func writeHeader(f *os.File, rate, ch int, format string) error {
+	info, err := f.Stat()
 	if err != nil {
 		return err
 	}
 	size := info.Size()
 
-	// FileSize
-	wf.file.Seek(4, io.SeekStart)
-	binary.Write(wf.file, binary.LittleEndian, int32(size-8))
+	var audioFormat uint16
+	switch format[0] {
+	case 'i':
+		audioFormat = 1
+	case 'f':
+		audioFormat = 3
+	default:
+		return fmt.Errorf("unknown audio format %d", format[0])
+	}
 
-	// Frequency
-	wf.file.Seek(24, io.SeekStart)
-	binary.Write(wf.file, binary.LittleEndian, int32(wf.outRate))
-
-	// DataSize
-	wf.file.Seek(40, io.SeekStart)
-	binary.Write(wf.file, binary.LittleEndian, int32(size-44))
-
-	var bytePerBlock int16
-	wf.file.Seek(32, io.SeekStart)
-	binary.Read(wf.file, binary.LittleEndian, &bytePerBlock)
-
-	// BytePerSec
-	wf.file.Seek(28, io.SeekStart)
-	binary.Write(wf.file, binary.LittleEndian, int32(bytePerBlock)*int32(wf.outRate))
-
-	return nil
-}
-
-func getInOutFiles(inPath, outPath string, outRate int) (io.ReadCloser, io.WriteCloser, error) {
-	in, err := os.Open(inPath)
+	bitsPerSample, err := strconv.Atoi(format[1:])
 	if err != nil {
-		return nil, nil, err
-	}
-	out, err := os.Create(outPath)
-	if err != nil {
-		return nil, nil, err
+		return fmt.Errorf("incorrect number of bits per sample %d", format[0])
 	}
 
-	header := make([]byte, 44)
-	if strings.ToLower(filepath.Ext(inPath)) == ".wav" {
-		_, err = io.ReadFull(in, header)
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	if strings.ToLower(filepath.Ext(outPath)) == ".wav" {
-		_, err := out.Write(header)
-		if err != nil {
-			return nil, nil, err
-		}
+	header := defaultHeader
+	header.FileSize = uint32(size - 8)
+	header.AudioFormat = audioFormat
+	header.NbrChannels = uint16(ch)
+	header.Frequency = uint32(rate)
+	header.BitsPerSample = uint16(bitsPerSample)
+	header.BytePerBlock = uint16(ch * bitsPerSample / 8)
+	header.BytePerSec = uint32(header.BytePerBlock) * header.Frequency
+	header.DataSize = uint32(size - 44)
 
-		out.Seek(44, io.SeekStart)
-
-		return in, &waveFile{
-			file:    out,
-			header:  header,
-			outRate: outRate,
-		}, nil
-	}
-
-	return in, out, nil
+	return binary.Write(f, binary.LittleEndian, &header)
 }
