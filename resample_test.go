@@ -165,12 +165,13 @@ func TestGetSincWindow(t *testing.T) {
 }
 
 func FuzzResampler(f *testing.F) {
-	f.Fuzz(func(t *testing.T, samples []byte, ir, or int) {
-		if len(samples)%2 != 0 {
-			return
+	f.Fuzz(func(t *testing.T, data []byte, ir, or, ch int) {
+		if ch <= 0 {
+			ch = -ch + 1
 		}
+		samples := data[:len(data)/(2*ch)*(2*ch)]
 
-		res, err := New[int16](io.Discard, ir, or, 1, LinearFilter[int16]())
+		res, err := New[int16](io.Discard, ir, or, ch, LinearFilter[int16]())
 		if err != nil {
 			return
 		}
