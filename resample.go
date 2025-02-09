@@ -76,12 +76,13 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	result := make([]T, shape*r.ch)
 
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
+	y := make([]T, shape)
+	channel := make([]T, n)
 	for i := 0; i < r.ch; i++ {
-		channel := make([]T, n)
 		for j := 0; j < n; j++ {
 			channel[j] = samples[j*r.ch+i]
 		}
-		y := r.convolve(channel, timeIncrement, shape)
+		r.convolve(channel, timeIncrement, y)
 		for j := 0; j < shape; j++ {
 			result[j*r.ch+i] = y[j]
 		}
@@ -94,8 +95,7 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	return len(input), nil
 }
 
-func (r *Resampler[T]) convolve(samples []T, timeIncrement float64, shape int) []T {
-	y := make([]T, shape)
+func (r *Resampler[T]) convolve(samples []T, timeIncrement float64, y []T) []T {
 	samplesLen := len(samples)
 	for t := range y {
 		var newSample float64
