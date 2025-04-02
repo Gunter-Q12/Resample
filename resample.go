@@ -31,7 +31,7 @@ var formatElementSize = map[Format]int{
 	FormatFloat64: 8,
 }
 
-type Resampler[T Number] struct {
+type Resampler struct {
 	outBuf   io.Writer
 	format   Format
 	inRate   int
@@ -41,15 +41,15 @@ type Resampler[T Number] struct {
 	elemSize int
 }
 
-func New[T Number](outBuffer io.Writer, format Format, inRate, outRate, ch int,
-	options ...Option[T]) (*Resampler[T], error) {
+func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
+	options ...Option) (*Resampler, error) {
 	if inRate <= 0 || outRate <= 0 || ch <= 0 {
 		return nil, errors.New("sampling rates and channel number must be greater than zero")
 	}
 
 	elemSize := formatElementSize[format]
 
-	resampler := &Resampler[T]{
+	resampler := &Resampler{
 		outBuf:   outBuffer,
 		format:   format,
 		inRate:   inRate,
@@ -65,7 +65,7 @@ func New[T Number](outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	}
 
 	if resampler.f == nil {
-		if err := KaiserBestFilter[T]()(resampler); err != nil {
+		if err := KaiserBestFilter()(resampler); err != nil {
 			return nil, err
 		}
 	}
@@ -73,7 +73,24 @@ func New[T Number](outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	return resampler, nil
 }
 
-func (r *Resampler[T]) Write(input []byte) (int, error) {
+func (r *Resampler) Write(input []byte) (int, error) {
+	switch r.format {
+	case FormatInt16:
+		return write[int16](r, input)
+	case FormatInt32:
+		return write[int32](r, input)
+	case FormatInt64:
+		return write[int64](r, input)
+	case FormatFloat32:
+		return write[float32](r, input)
+	case FormatFloat64:
+		return write[float64](r, input)
+	default:
+		panic("unknown format")
+	}
+}
+
+func write[T Number](r *Resampler, input []byte) (int, error) {
 	if r.inRate == r.outRate {
 		return r.outBuf.Write(input)
 	}
@@ -100,7 +117,7 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 		for j := 0; j < n; j++ {
 			channel[j] = samples[j*r.ch+i]
 		}
-		r.convolveAny(r.f, channel, timeIncrement, &y)
+		convolve[T](r.f, channel, timeIncrement, &y)
 		for j := 0; j < shape; j++ {
 			result[j*r.ch+i] = y[j]
 		}
@@ -111,23 +128,6 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 		return 0, fmt.Errorf("resampler write: %w", err)
 	}
 	return len(input), nil
-}
-
-func (r *Resampler[T]) convolveAny(f *filter, samples any, timeIncrement float64, y any) {
-	switch r.format {
-	case FormatInt16:
-		convolve[int16](f, samples.([]int16), timeIncrement, y.(*[]int16))
-	case FormatInt32:
-		convolve[int32](f, samples.([]int32), timeIncrement, y.(*[]int32))
-	case FormatInt64:
-		convolve[int64](f, samples.([]int64), timeIncrement, y.(*[]int64))
-	case FormatFloat32:
-		convolve[float32](f, samples.([]float32), timeIncrement, y.(*[]float32))
-	case FormatFloat64:
-		convolve[float64](f, samples.([]float64), timeIncrement, y.(*[]float64))
-	default:
-		panic("unknown format")
-	}
 }
 
 func convolve[T Number](f *filter, samples []T, timeIncrement float64, y *[]T) {

@@ -6,17 +6,17 @@ import (
 	"fmt"
 )
 
-type Option[T Number] func(*Resampler[T]) error
+type Option func(*Resampler) error
 
-func LinearFilter[T Number]() Option[T] {
-	return func(r *Resampler[T]) error {
+func LinearFilter() Option {
+	return func(r *Resampler) error {
 		r.f = newFilter([]float64{1, 0}, 1, 1)
 		return nil
 	}
 }
 
-func KaiserFastFilter[T Number]() Option[T] {
-	return func(r *Resampler[T]) error {
+func KaiserFastFilter() Option {
+	return func(r *Resampler) error {
 		interpWin, err := readWindowFromFile("filters/kaiser_fast_f64", 12289)
 		if err != nil {
 			return fmt.Errorf("new kaiser best filter: %w", err)
@@ -29,8 +29,8 @@ func KaiserFastFilter[T Number]() Option[T] {
 	}
 }
 
-func KaiserBestFilter[T Number]() Option[T] {
-	return func(r *Resampler[T]) error {
+func KaiserBestFilter() Option {
+	return func(r *Resampler) error {
 		interpWin, err := readWindowFromFile("filters/kaiser_best_f64", 409601)
 		if err != nil {
 			return fmt.Errorf("new kaiser best filter: %w", err)
@@ -43,8 +43,8 @@ func KaiserBestFilter[T Number]() Option[T] {
 	}
 }
 
-func HanningFilter[T Number](zeros, density int) Option[T] {
-	return func(r *Resampler[T]) error {
+func HanningFilter(zeros, density int) Option {
+	return func(r *Resampler) error {
 		interpWin := newHanningWindow(zeros, density)
 
 		scale := min(1.0, float64(r.outRate)/float64(r.inRate))

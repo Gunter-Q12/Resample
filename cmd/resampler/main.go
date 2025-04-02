@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"gitlab.com/gunter-go/resample"
 	"io"
 	"log"
@@ -21,6 +20,20 @@ var (
 	q      = flag.String("q", "kaiser_fast",
 		"Output quality: linear, kaiser_fast, kaiser_best")
 )
+
+var flagToFormat = map[string]resample.Format{
+	"i16": resample.FormatInt16,
+	"i32": resample.FormatInt32,
+	"i64": resample.FormatInt64,
+	"f32": resample.FormatFloat32,
+	"f64": resample.FormatFloat64,
+}
+
+var flagToFilter = map[string]resample.Option{
+	"linear":      resample.LinearFilter(),
+	"kaiser_fast": resample.KaiserFastFilter(),
+	"kaiser_best": resample.KaiserBestFilter(),
+}
 
 func main() {
 	flag.Parse()
@@ -59,58 +72,38 @@ func main() {
 			writeHeader(f, rate, ch, format)
 		}(out, *or, *ch, *format)
 	}
+
 	validateArgs()
 
-	var res io.Writer
-	switch *format {
-	case "i16":
-		res, err = getResampler[int16](out, *ir, *or, *ch, *q)
-	case "i32":
-		res, err = getResampler[int32](out, *ir, *or, *ch, *q)
-	case "i64":
-		res, err = getResampler[int64](out, *ir, *or, *ch, *q)
-	case "f32":
-		res, err = getResampler[float32](out, *ir, *or, *ch, *q)
-	case "f64":
-		res, err = getResampler[float64](out, *ir, *or, *ch, *q)
-	default:
-		err = fmt.Errorf("unsupported format: %s", *format)
-	}
+	res, err := resample.New(out, flagToFormat[*format], *ir, *or, *ch, flagToFilter[*q])
 	if err != nil {
 		os.Remove(outputPath)
-		log.Fatalln(err)
+		log.Fatalf("Error while creating a resampler: %s", err)
 	}
 
 	_, err = io.Copy(res, in)
 	if err != nil {
 		os.Remove(outputPath)
-		log.Fatalln(err)
+		log.Fatalf("Error while resampling: %s", err)
 	}
 }
 
 func validateArgs() {
 	if *ch <= 0 {
-		log.Fatalln("Specif correct number of channels")
+		log.Fatalf("Incorrect number of channels: %d. Must be > 0", *ch)
 	}
 	if *ir <= 0 {
-		log.Fatalln("Specif correct input sample rate")
+		log.Fatalf("Incorrect input rate: %d. Must be > 0", *ir)
 	}
 	if *or <= 0 {
-		log.Fatalln("Specif correct ouput sample rate")
+		log.Fatalf("Incorrect output rate: %d. Must be > 0", *or)
 	}
-}
 
-func getResampler[T resample.Number](output io.Writer, inRate, outRate int, ch int, q string) (*resample.Resampler[T], error) {
-	var filter resample.Option[T]
-	switch q {
-	case "linear":
-		filter = resample.LinearFilter[T]()
-	case "kaiser_fast":
-		filter = resample.KaiserFastFilter[T]()
-	case "kaiser_best":
-		filter = resample.KaiserBestFilter[T]()
-	default:
-		return nil, fmt.Errorf("unknown filter type: %s", q)
+	if _, ok := flagToFormat[*format]; !ok {
+		log.Fatalf("Incorrect format:: %s", *format)
 	}
-	return resample.New[T](output, inRate, outRate, ch, filter)
+
+	if _, ok := flagToFilter[*q]; !ok {
+		log.Fatalf("Incorrect quality: %s", *q)
+	}
 }

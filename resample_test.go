@@ -19,31 +19,31 @@ func TestResamplerInt(t *testing.T) {
 		ir     int
 		or     int
 		ch     int
-		filter Option[int16]
+		filter Option
 	}{
 		{name: "in=out",
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
-			err: nil, ir: 1, or: 1, ch: 1, filter: LinearFilter[int16]()},
+			err: nil, ir: 1, or: 1, ch: 1, filter: LinearFilter()},
 		{name: "not enough samples",
 			input: []int16{1},
-			err:   errors.New(""), ir: 1, or: 2, ch: 1, filter: LinearFilter[int16]()},
+			err:   errors.New(""), ir: 1, or: 2, ch: 1, filter: LinearFilter()},
 		{name: "simplest upsampling case",
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
-			err: nil, ir: 1, or: 2, ch: 1, filter: LinearFilter[int16]()},
+			err: nil, ir: 1, or: 2, ch: 1, filter: LinearFilter()},
 		{name: "simplest downsampling case",
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
-			err: nil, ir: 2, or: 1, ch: 1, filter: LinearFilter[int16]()},
+			err: nil, ir: 2, or: 1, ch: 1, filter: LinearFilter()},
 		{name: "two channels",
 			input:  []int16{1, 11, 3, 13, 5, 15},
 			output: []int16{1, 11, 2, 12, 3, 13, 4, 14, 5, 15},
-			err:    nil, ir: 1, or: 2, ch: 2, filter: LinearFilter[int16]()},
+			err:    nil, ir: 1, or: 2, ch: 2, filter: LinearFilter()},
 	}
 	for _, tt := range resamplerTestInt16 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := writeBuff(t, tt.input)
 
-			res, err := New[int16](outBuf, FormatInt16, tt.ir, tt.or, tt.ch, tt.filter)
+			res, err := New(outBuf, FormatInt16, tt.ir, tt.or, tt.ch, tt.filter)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -61,7 +61,7 @@ func TestResamplerInt(t *testing.T) {
 		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
 
-		res, err := New[int16](outBuf, FormatInt16, 1, 2, 1, LinearFilter[int16]())
+		res, err := New(outBuf, FormatInt16, 1, 2, 1, LinearFilter())
 		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)
@@ -92,39 +92,39 @@ func TestResamplerFloat(t *testing.T) {
 		err    error
 		ir     int
 		or     int
-		filter Option[float64]
+		filter Option
 	}{
 		{name: "Linear downsampling",
 			input:  []float64{0, 0.25, 0.5, 0.75},
 			output: []float64{0, 1.0 / 3, 2.0 / 3},
-			err:    nil, ir: 4, or: 3, filter: LinearFilter[float64]()},
+			err:    nil, ir: 4, or: 3, filter: LinearFilter()},
 		{name: "Linear upsampling",
 			input:  []float64{1, 2, 3},
 			output: []float64{1, 1.5, 2, 2.5, 3},
-			err:    nil, ir: 2, or: 4, filter: LinearFilter[float64]()},
+			err:    nil, ir: 2, or: 4, filter: LinearFilter()},
 		{name: "KaiserFast downsampling",
 			input:  sine8000,
 			output: sine125,
-			err:    nil, ir: 8000, or: 125, filter: KaiserFastFilter[float64]()},
+			err:    nil, ir: 8000, or: 125, filter: KaiserFastFilter()},
 		{name: "KaiserFast uplampling",
 			input:  sine125,
 			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: KaiserFastFilter[float64]()},
+			err:    nil, ir: 125, or: 8000, filter: KaiserFastFilter()},
 		{name: "KaiserBest uplampling",
 			input:  sine125,
 			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: KaiserBestFilter[float64]()},
+			err:    nil, ir: 125, or: 8000, filter: KaiserBestFilter()},
 		{name: "Hanning uplampling",
 			input:  sine125,
 			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: HanningFilter[float64](64, 9)},
+			err:    nil, ir: 125, or: 8000, filter: HanningFilter(64, 9)},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := writeBuff(t, tt.input)
 
-			res, err := New[float64](outBuf, FormatFloat64, tt.ir, tt.or, ch, tt.filter)
+			res, err := New(outBuf, FormatFloat64, tt.ir, tt.or, ch, tt.filter)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -171,7 +171,7 @@ func FuzzResampler(f *testing.F) {
 		}
 		samples := data[:len(data)/(2*ch)*(2*ch)]
 
-		res, err := New[int16](io.Discard, FormatInt16, ir, or, ch, LinearFilter[int16]())
+		res, err := New(io.Discard, FormatInt16, ir, or, ch, LinearFilter())
 		if err != nil {
 			return
 		}
@@ -180,7 +180,7 @@ func FuzzResampler(f *testing.F) {
 }
 
 func BenchmarkWrite(b *testing.B) {
-	r, err := New[float64](io.Discard, FormatFloat64, 8000, 44000, 2)
+	r, err := New(io.Discard, FormatFloat64, 8000, 44000, 2)
 	assert.NoError(b, err)
 
 	file, err := os.Open("./testdata/bench_samples.raw")
