@@ -43,7 +43,7 @@ func TestResamplerInt(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := writeBuff(t, tt.input)
 
-			res, err := New[int16](outBuf, tt.ir, tt.or, tt.ch, tt.filter)
+			res, err := New[int16](outBuf, FormatInt16, tt.ir, tt.or, tt.ch, tt.filter)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -61,7 +61,7 @@ func TestResamplerInt(t *testing.T) {
 		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
 
-		res, err := New[int16](outBuf, 1, 2, 1, LinearFilter[int16]())
+		res, err := New[int16](outBuf, FormatInt16, 1, 2, 1, LinearFilter[int16]())
 		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)
@@ -124,7 +124,7 @@ func TestResamplerFloat(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := writeBuff(t, tt.input)
 
-			res, err := New[float64](outBuf, tt.ir, tt.or, ch, tt.filter)
+			res, err := New[float64](outBuf, FormatFloat64, tt.ir, tt.or, ch, tt.filter)
 			assert.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -171,7 +171,7 @@ func FuzzResampler(f *testing.F) {
 		}
 		samples := data[:len(data)/(2*ch)*(2*ch)]
 
-		res, err := New[int16](io.Discard, ir, or, ch, LinearFilter[int16]())
+		res, err := New[int16](io.Discard, FormatInt16, ir, or, ch, LinearFilter[int16]())
 		if err != nil {
 			return
 		}
@@ -180,7 +180,7 @@ func FuzzResampler(f *testing.F) {
 }
 
 func BenchmarkWrite(b *testing.B) {
-	r, err := New[float64](io.Discard, 8000, 44000, 2)
+	r, err := New[float64](io.Discard, FormatFloat64, 8000, 44000, 2)
 	assert.NoError(b, err)
 
 	file, err := os.Open("./testdata/bench_samples.raw")

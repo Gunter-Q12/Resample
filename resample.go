@@ -7,15 +7,33 @@ import (
 	"fmt"
 	"golang.org/x/exp/constraints"
 	"io"
-	"reflect"
 )
 
 type Number interface {
 	constraints.Float | constraints.Integer
 }
 
+type Format int
+
+const (
+	FormatInt16 = iota
+	FormatInt32
+	FormatInt64
+	FormatFloat32
+	FormatFloat64
+)
+
+var formatElementSize = map[Format]int{
+	FormatInt16:   2,
+	FormatInt32:   4,
+	FormatInt64:   8,
+	FormatFloat32: 4,
+	FormatFloat64: 8,
+}
+
 type Resampler[T Number] struct {
 	outBuf   io.Writer
+	format   Format
 	inRate   int
 	outRate  int
 	ch       int
@@ -23,17 +41,17 @@ type Resampler[T Number] struct {
 	elemSize int
 }
 
-func New[T Number](outBuffer io.Writer, inRate, outRate, ch int,
+func New[T Number](outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	options ...Option[T]) (*Resampler[T], error) {
 	if inRate <= 0 || outRate <= 0 || ch <= 0 {
 		return nil, errors.New("sampling rates and channel number must be greater than zero")
 	}
 
-	var t T
-	elemSize := int(reflect.TypeOf(t).Size())
+	elemSize := formatElementSize[format]
 
 	resampler := &Resampler[T]{
 		outBuf:   outBuffer,
+		format:   format,
 		inRate:   inRate,
 		outRate:  outRate,
 		ch:       ch,
@@ -82,7 +100,7 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 		for j := 0; j < n; j++ {
 			channel[j] = samples[j*r.ch+i]
 		}
-		r.convolve(channel, timeIncrement, y)
+		r.convolveAny(r.f, channel, timeIncrement, &y)
 		for j := 0; j < shape; j++ {
 			result[j*r.ch+i] = y[j]
 		}
@@ -95,9 +113,26 @@ func (r *Resampler[T]) Write(input []byte) (int, error) {
 	return len(input), nil
 }
 
-func (r *Resampler[T]) convolve(samples []T, timeIncrement float64, y []T) []T {
+func (r *Resampler[T]) convolveAny(f *filter, samples any, timeIncrement float64, y any) {
+	switch r.format {
+	case FormatInt16:
+		convolve[int16](f, samples.([]int16), timeIncrement, y.(*[]int16))
+	case FormatInt32:
+		convolve[int32](f, samples.([]int32), timeIncrement, y.(*[]int32))
+	case FormatInt64:
+		convolve[int64](f, samples.([]int64), timeIncrement, y.(*[]int64))
+	case FormatFloat32:
+		convolve[float32](f, samples.([]float32), timeIncrement, y.(*[]float32))
+	case FormatFloat64:
+		convolve[float64](f, samples.([]float64), timeIncrement, y.(*[]float64))
+	default:
+		panic("unknown format")
+	}
+}
+
+func convolve[T Number](f *filter, samples []T, timeIncrement float64, y *[]T) {
 	samplesLen := len(samples)
-	for t := range y {
+	for t := range *y {
 		var newSample float64
 
 		timeRegister := float64(t) * timeIncrement
@@ -105,21 +140,20 @@ func (r *Resampler[T]) convolve(samples []T, timeIncrement float64, y []T) []T {
 		sampleId := int(timeRegister)
 
 		// computing left wing (because of the middle element)
-		iters := min(r.f.GetLength(offset), sampleId+1)
+		iters := min(f.GetLength(offset), sampleId+1)
 		for i := range iters {
-			weight := r.f.GetPoint(offset, i)
+			weight := f.GetPoint(offset, i)
 			newSample += weight * float64(samples[sampleId-i])
 		}
 
 		offset = 1 - offset
 
 		// computing right wing
-		iters = min(r.f.GetLength(offset), samplesLen-1-sampleId)
+		iters = min(f.GetLength(offset), samplesLen-1-sampleId)
 		for i := range iters {
-			weight := r.f.GetPoint(offset, i)
+			weight := f.GetPoint(offset, i)
 			newSample += weight * float64(samples[sampleId+i+1])
 		}
-		y[t] = T(newSample) // TODO: proper rounding
+		(*y)[t] = T(newSample) // TODO: proper rounding
 	}
-	return y
 }
