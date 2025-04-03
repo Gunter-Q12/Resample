@@ -5,8 +5,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io"
 	"os"
+	"reflect"
 	"testing"
 )
 
@@ -51,8 +53,8 @@ func TestResamplerInt(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				output := readBuff[int16](t, outBuf, len(tt.output))
-				assert.Equal(t, tt.output, output)
+				output := readBuff[int16](t, outBuf)
+				assert.Equal(t, tt.output, output[:len(tt.output)])
 			}
 		})
 	}
@@ -77,13 +79,13 @@ func TestResamplerFloat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sine8000 := readBuff[float64](t, file, 8000*3)
+	sine8000 := readBuff[float64](t, file)
 
 	file, err = os.Open("./testdata/sine_125_3_f64_ch1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	sine125 := readBuff[float64](t, file, 125*3)
+	sine125 := readBuff[float64](t, file)
 
 	resamplerTestFloat64 := []struct {
 		name   string
@@ -132,11 +134,11 @@ func TestResamplerFloat(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				output := readBuff[float64](t, outBuf, len(tt.output))
+				output := readBuff[float64](t, outBuf)
 				if len(output) > 20 {
 					assert.InDeltaSlicef(t, tt.output[10:10], output[10:10], .0001, "output: %v", output)
 				} else {
-					assert.InDeltaSlicef(t, tt.output, output, .0001, "output: %v", output)
+					assert.InDeltaSlicef(t, tt.output, output[:len(tt.output)], .0001, "output: %v", output)
 				}
 			}
 		})
@@ -155,7 +157,7 @@ func TestGetSincWindow(t *testing.T) {
 	} else if err != nil {
 		t.Fatal(err)
 	}
-	want := readBuff[float64](t, file, zeros*density+1)
+	want := readBuff[float64](t, file)
 
 	got := newHanningWindow(zeros, density)
 
@@ -221,11 +223,17 @@ func writeBuff(t testing.TB, values any) *bytes.Buffer {
 	return inBuf
 }
 
-func readBuff[T any](t testing.TB, buff io.Reader, len int) []T {
-	output := make([]T, len)
+func readBuff[T any](t testing.TB, buff io.Reader) []T {
+	t.Helper()
+	var v T
+	elemSize := int(reflect.TypeOf(v).Size())
 
-	err := binary.Read(buff, binary.LittleEndian, output)
-	assert.NoError(t, err)
+	data, err := io.ReadAll(buff)
+	require.NoError(t, err)
+
+	output := make([]T, len(data)/elemSize)
+	err = binary.Read(bytes.NewReader(data), binary.LittleEndian, output)
+	require.NoError(t, err)
 
 	return output
 }
