@@ -67,10 +67,10 @@ func (k filter) GetLength(offset float64) int {
 }
 
 func (k filter) GetPoint(offset float64, index int) float64 {
-	position := (offset + float64(index)) * k.scale
+	position := (offset + float64(index)) * k.scale * float64(k.density)
 	integer := float64(int(position))
 	frac := position - integer
-	sampleId := int(integer * float64(k.density))
+	sampleId := int(integer)
 
 	weight := k.interpWin[sampleId] + frac*k.interpDelta[sampleId]
 	return weight
