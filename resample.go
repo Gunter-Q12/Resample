@@ -102,11 +102,6 @@ func write[T Number](r *Resampler, input []byte) (int, error) {
 	}
 
 	n := len(samples) / r.ch
-
-	if n < 2 {
-		return 0, errors.New("input should have at least two samples")
-	}
-
 	shape := int(float64(n) * float64(r.outRate) / float64(r.inRate))
 	result := make([]T, shape*r.ch)
 
