@@ -111,17 +111,8 @@ func write[T Number](r *Resampler, input []byte) (int, error) {
 	result := make([]T, shape*r.ch)
 
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
-	y := make([]T, shape)
-	channel := make([]T, n)
-	for i := 0; i < r.ch; i++ {
-		for j := 0; j < n; j++ {
-			channel[j] = samples[j*r.ch+i]
-		}
-		convolve[T](r.f, channel, timeIncrement, &y)
-		for j := 0; j < shape; j++ {
-			result[j*r.ch+i] = y[j]
-		}
-	}
+
+	convolve[T](r.f, samples, timeIncrement, r.ch, &result)
 
 	err = binary.Write(r.outBuf, binary.LittleEndian, result)
 	if err != nil {
@@ -130,10 +121,11 @@ func write[T Number](r *Resampler, input []byte) (int, error) {
 	return len(input), nil
 }
 
-func convolve[T Number](f *filter, samples []T, timeIncrement float64, y *[]T) {
-	samplesLen := len(samples)
-	for t := range *y {
-		var newSample float64
+func convolve[T Number](f *filter, samples []T, timeIncrement float64, ch int, y *[]T) {
+	samplesLen := len(samples) / ch
+	newSamples := make([]float64, ch)
+
+	for t := range len(*y) / ch {
 
 		timeRegister := float64(t) * timeIncrement
 		offset := timeRegister - float64(int(timeRegister))
@@ -143,7 +135,9 @@ func convolve[T Number](f *filter, samples []T, timeIncrement float64, y *[]T) {
 		iters := min(f.GetLength(offset), sampleId+1)
 		for i := range iters {
 			weight := f.GetPoint(offset, i)
-			newSample += weight * float64(samples[sampleId-i])
+			for s := range newSamples {
+				newSamples[s] += weight * float64(samples[(sampleId-i)*ch+s])
+			}
 		}
 
 		offset = 1 - offset
@@ -152,8 +146,13 @@ func convolve[T Number](f *filter, samples []T, timeIncrement float64, y *[]T) {
 		iters = min(f.GetLength(offset), samplesLen-1-sampleId)
 		for i := range iters {
 			weight := f.GetPoint(offset, i)
-			newSample += weight * float64(samples[sampleId+i+1])
+			for s := range newSamples {
+				newSamples[s] += weight * float64(samples[(sampleId+i+1)*ch+s])
+			}
 		}
-		(*y)[t] = T(newSample) // TODO: proper rounding
+		for s := range newSamples {
+			(*y)[t*ch+s] = T(newSamples[s]) // TODO: proper rounding
+			newSamples[s] = 0
+		}
 	}
 }
