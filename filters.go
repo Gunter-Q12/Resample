@@ -15,6 +15,20 @@ func LinearFilter() Option {
 	}
 }
 
+func KaiserFastestFilter() Option {
+	return func(r *Resampler) error {
+		interpWin, err := readWindowFromFile("filters/kaiser_super_fast_f64", 385)
+		if err != nil {
+			return fmt.Errorf("new kaiser best filter: %w", err)
+		}
+
+		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
+		r.f = newFilter(interpWin, 32, scale)
+
+		return nil
+	}
+}
+
 func KaiserFastFilter() Option {
 	return func(r *Resampler) error {
 		interpWin, err := readWindowFromFile("filters/kaiser_fast_f64", 12289)

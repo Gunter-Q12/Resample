@@ -30,9 +30,10 @@ var flagToFormat = map[string]resample.Format{
 }
 
 var flagToFilter = map[string]resample.Option{
-	"linear":      resample.LinearFilter(),
-	"kaiser_fast": resample.KaiserFastFilter(),
-	"kaiser_best": resample.KaiserBestFilter(),
+	"linear":         resample.LinearFilter(),
+	"kaiser_fastest": resample.KaiserFastestFilter(),
+	"kaiser_fast":    resample.KaiserFastFilter(),
+	"kaiser_best":    resample.KaiserBestFilter(),
 }
 
 func main() {
