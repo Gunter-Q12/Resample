@@ -10,7 +10,7 @@ type Option func(*Resampler) error
 
 func LinearFilter() Option {
 	return func(r *Resampler) error {
-		r.f = newFilter([]float64{1, 0}, 1, 1)
+		r.f = newFilter([]float64{1, 0}, 1, 1, 1)
 		return nil
 	}
 }
@@ -22,9 +22,7 @@ func KaiserFastestFilter() Option {
 			return fmt.Errorf("new kaiser best filter: %w", err)
 		}
 
-		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.f = newFilter(interpWin, 32, scale)
-
+		r.f = newFilter(interpWin, 32, r.inRate, r.outRate)
 		return nil
 	}
 }
@@ -36,9 +34,7 @@ func KaiserFastFilter() Option {
 			return fmt.Errorf("new kaiser best filter: %w", err)
 		}
 
-		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.f = newFilter(interpWin, 512, scale)
-
+		r.f = newFilter(interpWin, 512, r.inRate, r.outRate)
 		return nil
 	}
 }
@@ -50,9 +46,7 @@ func KaiserBestFilter() Option {
 			return fmt.Errorf("new kaiser best filter: %w", err)
 		}
 
-		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.f = newFilter(interpWin, 8192, scale)
-
+		r.f = newFilter(interpWin, 8192, r.inRate, r.outRate)
 		return nil
 	}
 }
@@ -61,14 +55,13 @@ func HanningFilter(zeros, density int) Option {
 	return func(r *Resampler) error {
 		interpWin := newHanningWindow(zeros, density)
 
-		scale := min(1.0, float64(r.outRate)/float64(r.inRate))
-		r.f = newFilter(interpWin, density, scale)
-
+		r.f = newFilter(interpWin, density, r.inRate, r.outRate)
 		return nil
 	}
 }
 
 type filter struct {
+	precalcWins [][]float64
 	interpWin   []float64
 	interpDelta []float64
 	density     int
@@ -90,7 +83,8 @@ func (k filter) GetPoint(offset float64, index int) float64 {
 	return weight
 }
 
-func newFilter(interpWin []float64, density int, scale float64) *filter {
+func newFilter(interpWin []float64, density, inRate, outRate int) *filter {
+	scale := min(1.0, float64(outRate)/float64(inRate))
 	n := len(interpWin)
 	interpDelta := make([]float64, n)
 
