@@ -107,7 +107,11 @@ func write[T Number](r *Resampler, input []byte) (int, error) {
 
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
 
-	convolve[T](r.f, samples, timeIncrement, r.ch, &result)
+	if r.inRate < r.outRate {
+		convolveWithPrecalc[T](r.f, samples, timeIncrement, r.ch, &result)
+	} else {
+		convolve[T](r.f, samples, timeIncrement, r.ch, &result)
+	}
 
 	err = binary.Write(r.outBuf, binary.LittleEndian, result)
 	if err != nil {
@@ -141,6 +145,44 @@ func convolve[T Number](f *filter, samples []T, timeIncrement float64, ch int, y
 		iters = min(f.GetLength(offset), samplesLen-1-sampleId)
 		for i := range iters {
 			weight := f.GetPoint(offset, i)
+			for s := range newSamples {
+				newSamples[s] += weight * float64(samples[(sampleId+i+1)*ch+s])
+			}
+		}
+		for s := range newSamples {
+			(*y)[t*ch+s] = T(newSamples[s]) // TODO: proper rounding
+			newSamples[s] = 0
+		}
+	}
+}
+func convolveWithPrecalc[T Number](f *filter, samples []T, timeIncrement float64, ch int, y *[]T) {
+	samplesLen := len(samples) / ch
+	newSamples := make([]float64, ch)
+
+	possibleOffsets := len(f.precalcWins)
+	for t := range len(*y) / ch {
+		timeRegister := float64(t) * timeIncrement
+		sampleId := int(timeRegister)
+		offset := t % possibleOffsets
+
+		// computing left wing (because of the middle element)
+		iters := min(len(f.precalcWins[offset]), sampleId+1)
+		for i := range iters {
+			weight := f.precalcWins[offset][i]
+			for s := range newSamples {
+				newSamples[s] += weight * float64(samples[(sampleId-i)*ch+s])
+			}
+		}
+
+		offset = (possibleOffsets - offset) % possibleOffsets
+
+		// computing right wing
+		iters = min(len(f.precalcWins[offset]), samplesLen-1-sampleId)
+		if offset == 0 {
+			iters = 0
+		}
+		for i := range iters {
+			weight := f.precalcWins[offset][i]
 			for s := range newSamples {
 				newSamples[s] += weight * float64(samples[(sampleId+i+1)*ch+s])
 			}
