@@ -19,6 +19,7 @@ var (
 	or     = flag.Int("or", 0, "Output sample rate in Hz")
 	q      = flag.String("q", "kaiser_fast",
 		"Output quality: linear, kaiser_fast, kaiser_best")
+	ml = flag.Int("ml", 50*1024*1024, "Memory limit in bytes. 0 disable memoization. -1 means no limit")
 )
 
 var flagToFormat = map[string]resample.Format{
@@ -76,7 +77,7 @@ func main() {
 
 	validateArgs()
 
-	res, err := resample.New(out, flagToFormat[*format], *ir, *or, *ch, flagToFilter[*q])
+	res, err := resample.New(out, flagToFormat[*format], *ir, *or, *ch, flagToFilter[*q], resample.MemoryLimit(*ml))
 	if err != nil {
 		os.Remove(outputPath)
 		log.Fatalf("Error while creating a resampler: %s", err)

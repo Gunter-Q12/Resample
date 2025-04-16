@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"golang.org/x/exp/constraints"
 	"io"
+	"slices"
 )
 
 type Number interface {
@@ -37,6 +38,7 @@ type Resampler struct {
 	inRate   int
 	outRate  int
 	ch       int
+	memLimit int
 	f        *filter
 	elemSize int
 }
@@ -58,14 +60,17 @@ func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 		elemSize: elemSize,
 	}
 
+	slices.SortFunc(options, optionCmp)
+	// TODO: apply filter option last
+
 	for _, option := range options {
-		if err := option(resampler); err != nil {
+		if err := option.apply(resampler); err != nil {
 			return nil, err
 		}
 	}
 
 	if resampler.f == nil {
-		if err := KaiserBestFilter()(resampler); err != nil {
+		if err := KaiserBestFilter().apply(resampler); err != nil {
 			return nil, err
 		}
 	}
