@@ -1,9 +1,9 @@
-package resample
+package resample_test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gitlab.com/gunter-go/resample"
 	"io"
 	"os"
 	"testing"
@@ -20,13 +20,14 @@ func TestResamplerPrecision(t *testing.T) {
 
 	t.Run("Upsample", func(t *testing.T) {
 		_, err = music16Data.Seek(0, io.SeekStart)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		out := new(bytes.Buffer)
-		resampler, err := New(out, FormatInt16, 16000, 48000, 1)
-		assert.NoError(t, err)
+		resampler, err := resample.New(out, resample.FormatInt16, 16000, 48000, 1)
+		require.NoError(t, err)
 
 		_, err = io.Copy(resampler, music16Data)
+		require.NoError(t, err)
 		music48Res := readBuff[int16](t, out)
 		music48Res = music48Res[:len(music48Res)-2]
 
@@ -36,12 +37,13 @@ func TestResamplerPrecision(t *testing.T) {
 
 	t.Run("Downsample", func(t *testing.T) {
 		_, err = music48Data.Seek(0, io.SeekStart)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		out := new(bytes.Buffer)
-		resampler, err := New(out, FormatInt16, 48000, 16000, 1)
-		assert.NoError(t, err)
+		resampler, err := resample.New(out, resample.FormatInt16, 48000, 16000, 1)
+		require.NoError(t, err)
 
 		_, err = io.Copy(resampler, music48Data)
+		require.NoError(t, err)
 		music16Res := readBuff[int16](t, out)
 
 		t.Logf("original len: %d, resampled len: %d", len(music16[:len(music16Res)]), len(music16Res))
@@ -51,7 +53,7 @@ func TestResamplerPrecision(t *testing.T) {
 
 func stats(t testing.TB, expected, actual []int16) {
 	t.Helper()
-	require.Equal(t, len(expected), len(actual))
+	require.Len(t, expected, len(actual))
 
 	var avgDelta int
 	for i := range expected {
@@ -61,7 +63,7 @@ func stats(t testing.TB, expected, actual []int16) {
 		}
 		avgDelta += int(delta)
 	}
-	avgDelta = avgDelta / len(expected)
+	avgDelta /= len(expected)
 	t.Logf("avg delta: %d", avgDelta)
 	require.LessOrEqual(t, avgDelta, 90)
 }

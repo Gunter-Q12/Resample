@@ -6,7 +6,10 @@ import (
 	"fmt"
 )
 
-//type Option func(*Resampler) error
+const (
+	filterPrecedence      = 50
+	memoryLimitPrecedence = 100
+)
 
 type Option struct {
 	precedence int
@@ -19,7 +22,7 @@ func optionCmp(a, b Option) int {
 
 func WithMemoryLimit(bytes int) Option {
 	return Option{
-		precedence: 100,
+		precedence: memoryLimitPrecedence,
 		apply: func(r *Resampler) error {
 			r.memLimit = bytes
 			return nil
@@ -29,7 +32,7 @@ func WithMemoryLimit(bytes int) Option {
 
 func WithLinearFilter() Option {
 	return Option{
-		precedence: 50,
+		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
 			r.f = newFilter([]float64{1, 0}, 1, r.inRate, r.outRate, r.memLimit, true)
 			return nil
@@ -39,7 +42,7 @@ func WithLinearFilter() Option {
 
 func WithKaiserFastestFilter() Option {
 	return Option{
-		precedence: 50,
+		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
 			interpWin, err := readWindowFromFile("filters/kaiser_super_fast_f64", 385)
 			if err != nil {
@@ -54,7 +57,7 @@ func WithKaiserFastestFilter() Option {
 
 func WithKaiserFastFilter() Option {
 	return Option{
-		precedence: 50,
+		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
 			interpWin, err := readWindowFromFile("filters/kaiser_fast_f64", 12289)
 			if err != nil {
@@ -69,7 +72,7 @@ func WithKaiserFastFilter() Option {
 
 func WithKaiserBestFilter() Option {
 	return Option{
-		precedence: 50,
+		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
 			interpWin, err := readWindowFromFile("filters/kaiser_best_f64", 409601)
 			if err != nil {
@@ -99,9 +102,9 @@ func (k filter) GetPoint(offset float64, index int) float64 {
 	position := (offset + float64(index)) * k.scale * float64(k.density)
 	integer := float64(int(position))
 	frac := position - integer
-	sampleId := int(integer)
+	sampleID := int(integer)
 
-	weight := k.interpWin[sampleId] + frac*k.interpDelta[sampleId]
+	weight := k.interpWin[sampleID] + frac*k.interpDelta[sampleID]
 	return weight
 }
 
@@ -113,7 +116,7 @@ func newFilter(interpWin []float64, density, inRate, outRate, memLimit int, isLi
 	n := len(interpWin)
 	interpDelta := make([]float64, n)
 
-	for i := 0; i < n-1; i++ {
+	for i := range n - 1 {
 		interpDelta[i] = (interpWin[i+1] - interpWin[i]) * scale
 		interpWin[i] *= scale
 	}
@@ -135,12 +138,12 @@ func newFilter(interpWin []float64, density, inRate, outRate, memLimit int, isLi
 	}
 	precalcWins = make([][]float64, copies)
 	timeIncrement := float64(inRate) / float64(outRate)
-	for i := 0; i < copies; i++ {
+	for i := range copies {
 		offset := timeIncrement * float64(i)
 		offset -= float64(int(offset))
 		length := f.GetLength(offset)
 		precalcWins[i] = make([]float64, length)
-		for j := 0; j < length; j++ {
+		for j := range length {
 			precalcWins[i][j] = f.GetPoint(offset, j)
 		}
 	}
