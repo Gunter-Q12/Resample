@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-const wavHeaderSize = 44
-
 var (
 	format = flag.String("format", "", "PCM format: i16, i32, i64, f32, f64")
 	ch     = flag.Int("ch", 0, "Number of channels")
@@ -40,7 +38,7 @@ var flagToFilter = map[string]resample.Option{
 func main() {
 	flag.Parse()
 
-	if flag.NArg() < 2 {
+	if flag.NArg() < 2 { //nolint:mnd // two input files needed
 		log.Fatalln("No input or output files given")
 	}
 	inputPath := flag.Arg(0)
@@ -68,10 +66,10 @@ func main() {
 	defer out.Close()
 
 	if strings.ToLower(filepath.Ext(outputPath)) == ".wav" {
-		out.Seek(wavHeaderSize, io.SeekStart)
+		_, _ = out.Seek(wavHeaderSize, io.SeekStart)
 		defer func(f *os.File, rate, ch int, format string) {
-			f.Seek(0, io.SeekStart)
-			writeHeader(f, rate, ch, format)
+			_, _ = f.Seek(0, io.SeekStart)
+			_ = writeHeader(f, rate, ch, format)
 		}(out, *or, *ch, *format)
 	}
 
@@ -85,13 +83,13 @@ func main() {
 	}
 	res, err := resample.New(out, flagToFormat[*format], *ir, *or, *ch, options...)
 	if err != nil {
-		os.Remove(outputPath)
+		_ = os.Remove(outputPath)
 		log.Fatalf("Error while creating a resampler: %s", err)
 	}
 
 	_, err = io.Copy(res, in)
 	if err != nil {
-		os.Remove(outputPath)
+		_ = os.Remove(outputPath)
 		log.Fatalf("Error while resampling: %s", err)
 	}
 }

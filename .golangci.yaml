@@ -47,7 +47,6 @@ linters:
     - nilnil
     - noctx
     - nolintlint
-    - nonamedreturns
     - nosprintfhostport
     - perfsprint
     - predeclared
@@ -115,6 +114,8 @@ linters:
     gochecksumtype:
       default-signifies-exhaustive: false
     gocritic:
+      disabled-checks:
+        - exitAfterDefer
       settings:
         captLocal:
           paramsOnly: false

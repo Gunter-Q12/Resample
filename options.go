@@ -2,7 +2,7 @@ package resample
 
 const (
 	filterPrecedence      = 50
-	memoryLimitPrecedence = 100
+	memoizationPrecedence = 100
 )
 
 // Option is a struct used to configure [Resampler].
@@ -26,7 +26,7 @@ func optionCmp(a, b Option) int {
 // .
 func WithNoMemoization() Option {
 	return Option{
-		precedence: memoryLimitPrecedence,
+		precedence: memoizationPrecedence,
 		apply: func(r *Resampler) error {
 			r.isMemoization = false
 			return nil

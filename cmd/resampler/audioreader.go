@@ -7,12 +7,21 @@ import (
 	"strconv"
 )
 
-type wavHeader struct {
-	FileTypeBlockId [4]byte
-	FileSize        uint32
-	FileFormatId    [4]byte
+const (
+	byteSize = 8
 
-	FormatBlockId [4]byte
+	wavHeaderSize       = 44
+	wavBlockSize        = 16 // 18 and 40-bit headers are not supported
+	wavIntAudioFormat   = 1
+	wavFloatAudioFormat = 3
+)
+
+type wavHeader struct {
+	FileTypeBlockID [4]byte
+	FileSize        uint32
+	FileFormatID    [4]byte
+
+	FormatBlockID [4]byte
 	BlockSize     uint32
 	AudioFormat   uint16
 	NbrChannels   uint16
@@ -21,16 +30,16 @@ type wavHeader struct {
 	BytePerBlock  uint16
 	BitsPerSample uint16
 
-	DataBlockId [4]byte
+	DataBlockID [4]byte
 	DataSize    uint32
 }
 
 var defaultHeader = wavHeader{
-	FileTypeBlockId: [4]byte{'R', 'I', 'F', 'F'},
-	FileFormatId:    [4]byte{'W', 'A', 'V', 'E'},
-	FormatBlockId:   [4]byte{'f', 'm', 't', ' '},
-	DataBlockId:     [4]byte{'d', 'a', 't', 'a'},
-	BlockSize:       16, // 18 and 40-bit headers are not supported
+	FileTypeBlockID: [4]byte{'R', 'I', 'F', 'F'},
+	FileFormatID:    [4]byte{'W', 'A', 'V', 'E'},
+	FormatBlockID:   [4]byte{'f', 'm', 't', ' '},
+	DataBlockID:     [4]byte{'d', 'a', 't', 'a'},
+	BlockSize:       wavBlockSize,
 }
 
 func readHeader(f *os.File) (rate, ch int, format string, err error) {
@@ -43,16 +52,16 @@ func readHeader(f *os.File) (rate, ch int, format string, err error) {
 	ch = int(header.NbrChannels)
 	bitsPerSample := strconv.Itoa(int(header.BitsPerSample))
 
-	if header.AudioFormat == 1 {
+	switch header.AudioFormat {
+	case wavIntAudioFormat:
 		return rate, ch, "i" + bitsPerSample, nil
-	}
-	if header.AudioFormat == 3 {
+	case wavFloatAudioFormat:
 		return rate, ch, "f" + bitsPerSample, nil
 	}
-
-	return
+	return 0, 0, "", fmt.Errorf("unknown audio format: %d", header.AudioFormat)
 }
 
+//nolint:gosec // unsafe work with bytes
 func writeHeader(f *os.File, rate, ch int, format string) error {
 	info, err := f.Stat()
 	if err != nil {
@@ -63,9 +72,9 @@ func writeHeader(f *os.File, rate, ch int, format string) error {
 	var audioFormat uint16
 	switch format[0] {
 	case 'i':
-		audioFormat = 1
+		audioFormat = wavIntAudioFormat
 	case 'f':
-		audioFormat = 3
+		audioFormat = wavFloatAudioFormat
 	default:
 		return fmt.Errorf("unknown audio format %d", format[0])
 	}
@@ -76,14 +85,14 @@ func writeHeader(f *os.File, rate, ch int, format string) error {
 	}
 
 	header := defaultHeader
-	header.FileSize = uint32(size - 8)
+	header.FileSize = uint32(size - 8) //nolint:mnd // I do not know why there is an 8
 	header.AudioFormat = audioFormat
 	header.NbrChannels = uint16(ch)
 	header.Frequency = uint32(rate)
 	header.BitsPerSample = uint16(bitsPerSample)
-	header.BytePerBlock = uint16(ch * bitsPerSample / 8)
+	header.BytePerBlock = uint16(ch * bitsPerSample / byteSize)
 	header.BytePerSec = uint32(header.BytePerBlock) * header.Frequency
-	header.DataSize = uint32(size - 44)
+	header.DataSize = uint32(size - wavHeaderSize)
 
 	return binary.Write(f, binary.LittleEndian, &header)
 }
