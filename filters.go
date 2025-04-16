@@ -57,10 +57,10 @@ func newFilter(info filterInfo, inRate, outRate int, memoization bool) *filter {
 	for i := range offsets {
 		offset := timeIncrement * float64(i)
 		offset -= float64(int(offset))
-		length := f.GetLength(offset)
+		length := f.Length(offset)
 		offsetWins[i] = make([]float64, length)
 		for j := range length {
-			offsetWins[i][j] = f.GetPoint(offset, j)
+			offsetWins[i][j] = f.Value(offset, j)
 		}
 	}
 
@@ -71,19 +71,22 @@ func newFilter(info filterInfo, inRate, outRate int, memoization bool) *filter {
 	}
 }
 
-// GetLength returns the number of samples that one wing of window
-// covers
-func (k filter) GetLength(offset float64) int {
-	return int(float64(k.crossings)/k.scale - offset)
+// Length is the number of samples that one wing of the window covers
+// starting from given offset.
+func (f filter) Length(offset float64) int {
+	return int(float64(f.crossings)/f.scale - offset)
 }
 
-func (k filter) GetPoint(offset float64, index int) float64 {
-	position := (offset + float64(index)) * k.scale * float64(k.density)
+// Value is a window value at a given point.
+//
+// Point is provide as a fraction and integer parts
+func (f filter) Value(offset float64, index int) float64 {
+	position := (offset + float64(index)) * f.scale * float64(f.density)
 	integer := float64(int(position))
 	frac := position - integer
 	sampleID := int(integer)
 
-	weight := k.interpWin[sampleID] + frac*k.interpDelta[sampleID]
+	weight := f.interpWin[sampleID] + frac*f.interpDelta[sampleID]
 	return weight
 }
 

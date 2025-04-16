@@ -150,9 +150,9 @@ func convolve[T number](f *filter, samples []T, timeIncrement float64, ch int, y
 		sampleID := int(timeRegister)
 
 		// computing left wing (because of the middle element)
-		iters := min(f.GetLength(offset), sampleID+1)
+		iters := min(f.Length(offset), sampleID+1)
 		for i := range iters {
-			weight := f.GetPoint(offset, i)
+			weight := f.Value(offset, i)
 			for s := range newSamples {
 				newSamples[s] += weight * float64(samples[(sampleID-i)*ch+s])
 			}
@@ -161,9 +161,9 @@ func convolve[T number](f *filter, samples []T, timeIncrement float64, ch int, y
 		offset = 1 - offset
 
 		// computing right wing
-		iters = min(f.GetLength(offset), samplesLen-1-sampleID)
+		iters = min(f.Length(offset), samplesLen-1-sampleID)
 		for i := range iters {
-			weight := f.GetPoint(offset, i)
+			weight := f.Value(offset, i)
 			for s := range newSamples {
 				newSamples[s] += weight * float64(samples[(sampleID+i+1)*ch+s])
 			}
