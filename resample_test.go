@@ -3,6 +3,7 @@ package resample
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -192,4 +193,32 @@ func readBuff[T any](t testing.TB, buff io.Reader) []T {
 	require.NoError(t, err)
 
 	return output
+}
+
+func Example_resamplingFile() {
+	input, _ := os.Open("./original.raw")
+	output, _ := os.Create("./resampled.raw")
+
+	res, _ := New(output, FormatInt16, 48000, 16000, 2)
+	_, _ = io.Copy(res, input)
+}
+
+func Example_resamplingSlice() {
+	// Convert slice of values into a slice of bytes
+	input := []int16{1, 3, 5}
+	inputData := new(bytes.Buffer)
+	_ = binary.Write(inputData, binary.LittleEndian, input)
+
+	// Resample
+	outBuf := new(bytes.Buffer)
+	res, _ := New(outBuf, FormatInt16, 1, 2, 1, LinearFilter())
+	_, _ = res.Write(inputData.Bytes())
+
+	// Convert bytes back to a slice of values
+	output := make([]int16, 5)
+	_ = binary.Read(outBuf, binary.LittleEndian, output)
+
+	fmt.Println(output)
+
+	// Output: [1 2 3 4 5]
 }
