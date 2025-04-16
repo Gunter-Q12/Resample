@@ -79,7 +79,7 @@ func (f filter) Length(offset float64) int {
 
 // Value is a window value at a given point.
 //
-// Point is provide as a fraction and integer parts
+// Point is provide as a fraction and integer parts.
 func (f filter) Value(offset float64, index int) float64 {
 	position := (offset + float64(index)) * f.scale * float64(f.density)
 	integer := float64(int(position))
