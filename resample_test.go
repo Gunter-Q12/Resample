@@ -3,7 +3,6 @@ package resample
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -113,10 +112,6 @@ func TestResamplerFloat(t *testing.T) {
 			input:  sine125,
 			output: sine8000,
 			err:    nil, ir: 125, or: 8000, filter: KaiserBestFilter()},
-		{name: "Hanning uplampling",
-			input:  sine125,
-			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: HanningFilter(64, 9)},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
@@ -140,27 +135,6 @@ func TestResamplerFloat(t *testing.T) {
 			}
 		})
 	}
-}
-func TestGetSincWindow(t *testing.T) {
-	path := "./testdata/sinc_window_"
-	zeros := 16
-	density := 8
-
-	file, err := os.OpenFile(path+"want", os.O_RDONLY, 0666)
-	if errors.Is(err, os.ErrNotExist) {
-		want := newHanningWindow(zeros, density)
-		toFile(t, want, path+"got")
-		t.Fatalf("Check saved results.\nRename file form *_got to *_want\nRun the test again")
-	} else if err != nil {
-		t.Fatal(err)
-	}
-	want := readBuff[float64](t, file)
-
-	got := newHanningWindow(zeros, density)
-
-	toFile(t, got, path+"got")
-	assert.Lenf(t, got, len(want), "want: %d, got: %d", len(want), len(got))
-	assert.InDeltaSlice(t, want, got, 0.0001)
 }
 
 func FuzzResampler(f *testing.F) {
@@ -193,21 +167,6 @@ func BenchmarkWrite(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, err := r.Write(samples)
 		assert.NoError(b, err)
-	}
-}
-
-func toFile(t *testing.T, values any, path string) {
-	t.Helper()
-
-	file, err := os.Create(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer file.Close()
-
-	err = binary.Write(file, binary.LittleEndian, values)
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 

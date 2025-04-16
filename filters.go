@@ -82,18 +82,6 @@ func KaiserBestFilter() Option {
 	}
 }
 
-func HanningFilter(zeros, density int) Option {
-	return Option{
-		precedence: 50,
-		apply: func(r *Resampler) error {
-			interpWin := newHanningWindow(zeros, density)
-
-			r.f = newFilter(interpWin, density, r.inRate, r.outRate, r.memLimit, false)
-			return nil
-		},
-	}
-}
-
 type filter struct {
 	precalcWins [][]float64
 	interpWin   []float64
