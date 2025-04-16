@@ -2,6 +2,7 @@ package resample
 
 import (
 	"bytes"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
 	"os"
@@ -15,16 +16,37 @@ func TestResamplerPrecision(t *testing.T) {
 
 	music16Data, err := os.Open("./testdata/speech_sample_mono14.7kHz16bit.raw")
 	require.NoError(t, err)
+	music16 := readBuff[int16](t, music16Data)
 
-	out := new(bytes.Buffer)
-	resampler, err := New(out, FormatInt16, 16000, 48000, 1)
+	t.Run("Upsample", func(t *testing.T) {
+		_, err = music16Data.Seek(0, io.SeekStart)
+		assert.NoError(t, err)
 
-	_, err = io.Copy(resampler, music16Data)
-	music48Res := readBuff[int16](t, out)
-	music48Res = music48Res[:len(music48Res)-2]
+		out := new(bytes.Buffer)
+		resampler, err := New(out, FormatInt16, 16000, 48000, 1)
+		assert.NoError(t, err)
 
-	t.Logf("original len: %d, resampled len: %d", len(music48), len(music48Res))
-	stats(t, music48, music48Res)
+		_, err = io.Copy(resampler, music16Data)
+		music48Res := readBuff[int16](t, out)
+		music48Res = music48Res[:len(music48Res)-2]
+
+		t.Logf("original len: %d, resampled len: %d", len(music48), len(music48Res))
+		stats(t, music48, music48Res)
+	})
+
+	t.Run("Downsample", func(t *testing.T) {
+		_, err = music48Data.Seek(0, io.SeekStart)
+		assert.NoError(t, err)
+		out := new(bytes.Buffer)
+		resampler, err := New(out, FormatInt16, 48000, 16000, 1)
+		assert.NoError(t, err)
+
+		_, err = io.Copy(resampler, music48Data)
+		music16Res := readBuff[int16](t, out)
+
+		t.Logf("original len: %d, resampled len: %d", len(music16[:len(music16Res)]), len(music16Res))
+		stats(t, music16[:len(music16Res)], music16Res)
+	})
 }
 
 func stats(t testing.TB, expected, actual []int16) {
