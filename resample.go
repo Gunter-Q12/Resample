@@ -177,11 +177,12 @@ func convolveWithPrecalc[T Number](f *filter, samples []T, timeIncrement float64
 		offset = (possibleOffsets - offset) % possibleOffsets
 
 		// computing right wing
+		start := 0
 		iters = min(len(f.precalcWins[offset]), samplesLen-1-sampleId)
 		if offset == 0 {
-			iters = 0
+			start = 1
 		}
-		for i := range iters {
+		for i := start; i < iters; i++ {
 			weight := f.precalcWins[offset][i]
 			for s := range newSamples {
 				newSamples[s] += weight * float64(samples[(sampleId+i+1)*ch+s])
