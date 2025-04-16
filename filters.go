@@ -13,6 +13,7 @@ type filter struct {
 	interpWin   []float64   // Window used for interpolation (scaled)
 	interpDelta []float64   // Differences calculated as interpWin[i+1] - interpWin[i]
 	offsetWins  [][]float64 // Window values at all points that may be used in calculations with current in/out ratio
+	crossings   int         // Number of zero-crossings
 	density     int         // Number of window values between two zero-crossings
 	scale       float64     // Window scaling used during downsamplig to avoid aliasing
 }
@@ -39,6 +40,7 @@ func newFilter(info filterInfo, inRate, outRate int, memoization bool) *filter {
 	f := &filter{
 		interpWin:   interpWin,
 		interpDelta: interpDelta,
+		crossings:   info.length / info.density,
 		density:     info.density,
 		scale:       scale,
 	}
@@ -72,8 +74,7 @@ func newFilter(info filterInfo, inRate, outRate int, memoization bool) *filter {
 // GetLength returns the number of samples that one wing of window
 // covers
 func (k filter) GetLength(offset float64) int {
-	return int(
-		(float64(len(k.interpWin)) - offset*k.scale*float64(k.density)) / k.scale / float64(k.density))
+	return int(float64(k.crossings)/k.scale - offset)
 }
 
 func (k filter) GetPoint(offset float64, index int) float64 {
