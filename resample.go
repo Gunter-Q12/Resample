@@ -10,14 +10,14 @@ import (
 	"slices"
 )
 
-type Number interface {
+type number interface {
 	constraints.Float | constraints.Integer
 }
 
 type Format int
 
 const (
-	FormatInt16 = iota
+	FormatInt16 Format = iota
 	FormatInt32
 	FormatInt64
 	FormatFloat32
@@ -104,7 +104,7 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	return int64(n), err
 }
 
-func write[T Number](r *Resampler, input []byte) (int, error) {
+func write[T number](r *Resampler, input []byte) (int, error) {
 	if r.inRate == r.outRate {
 		return r.outBuf.Write(input)
 	}
@@ -139,7 +139,7 @@ func write[T Number](r *Resampler, input []byte) (int, error) {
 	return len(input), nil
 }
 
-func convolve[T Number](f *filter, samples []T, timeIncrement float64, ch int, y *[]T) {
+func convolve[T number](f *filter, samples []T, timeIncrement float64, ch int, y *[]T) {
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
@@ -175,7 +175,7 @@ func convolve[T Number](f *filter, samples []T, timeIncrement float64, ch int, y
 	}
 }
 
-func convolveWithPrecalc[T Number](f *filter, samples []float64, timeIncrement float64, ch int, y *[]T) {
+func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement float64, ch int, y *[]T) {
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
