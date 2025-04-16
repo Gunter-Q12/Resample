@@ -119,8 +119,8 @@ func write[T number](r *Resampler, input []byte) (int, error) {
 	result := make([]T, shape*r.ch)
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
 
-	if r.f.offsetWins != nil {
-		convolveWithPrecalc[T](r.f, samples, timeIncrement, r.ch, result)
+	if r.memoization {
+		convolveWithMemoization[T](r.f, samples, timeIncrement, r.ch, result)
 	} else {
 		convolve[T](r.f, samples, timeIncrement, r.ch, result)
 	}
@@ -186,7 +186,7 @@ func convolve[T number](f *filter, samples []float64, timeIncrement float64, ch 
 	}
 }
 
-func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement float64, ch int, y []T) {
+func convolveWithMemoization[T number](f *filter, samples []float64, timeIncrement float64, ch int, y []T) {
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
