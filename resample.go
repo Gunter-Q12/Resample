@@ -90,6 +90,15 @@ func (r *Resampler) Write(input []byte) (int, error) {
 	}
 }
 
+func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return 0, fmt.Errorf("resampler: reading from: %w", err)
+	}
+	n, err := r.Write(data)
+	return int64(n), err
+}
+
 func write[T Number](r *Resampler, input []byte) (int, error) {
 	if r.inRate == r.outRate {
 		return r.outBuf.Write(input)
