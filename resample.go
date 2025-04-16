@@ -120,9 +120,9 @@ func write[T number](r *Resampler, input []byte) (int, error) {
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
 
 	if r.f.offsetWins != nil {
-		convolveWithPrecalc[T](r.f, samples, timeIncrement, r.ch, &result)
+		convolveWithPrecalc[T](r.f, samples, timeIncrement, r.ch, result)
 	} else {
-		convolve[T](r.f, samples, timeIncrement, r.ch, &result)
+		convolve[T](r.f, samples, timeIncrement, r.ch, result)
 	}
 
 	err = binary.Write(r.outBuf, binary.LittleEndian, result)
@@ -147,21 +147,22 @@ func getSamples[T number](input []byte, elemSize int) ([]float64, error) {
 	return fSamples, nil
 }
 
-func convolve[T number](f *filter, samples []float64, timeIncrement float64, ch int, y *[]T) {
+func convolve[T number](f *filter, samples []float64, timeIncrement float64, ch int, y []T) {
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
-	for t := range len(*y) / ch {
+	for t := range len(y) / ch {
 		timeRegister := float64(t) * timeIncrement
 		offset := timeRegister - float64(int(timeRegister))
 		sampleID := int(timeRegister)
 
-		// computing left wing (because of the middle element)
+		// computing left wing including the middle element
 		iters := min(f.Length(offset), sampleID+1)
 		for i := range iters {
 			weight := f.Value(offset, i)
+			batchID := (sampleID - i) * ch
 			for s := range newSamples {
-				newSamples[s] += weight * samples[(sampleID-i)*ch+s]
+				newSamples[s] += weight * samples[batchID+s]
 			}
 		}
 
@@ -171,28 +172,30 @@ func convolve[T number](f *filter, samples []float64, timeIncrement float64, ch 
 		iters = min(f.Length(offset), samplesLen-1-sampleID)
 		for i := range iters {
 			weight := f.Value(offset, i)
+			batchID := (sampleID + i + 1) * ch
 			for s := range newSamples {
-				newSamples[s] += weight * samples[(sampleID+i+1)*ch+s]
+				newSamples[s] += weight * samples[batchID+s]
 			}
 		}
+
+		batchID := t * ch
 		for s := range newSamples {
-			(*y)[t*ch+s] = T(newSamples[s]) // TODO: proper rounding
+			y[batchID+s] = T(newSamples[s])
 			newSamples[s] = 0
 		}
 	}
 }
 
-func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement float64, ch int, y *[]T) {
+func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement float64, ch int, y []T) {
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
 	possibleOffsets := len(f.offsetWins)
-	for t := range len(*y) / ch {
-		timeRegister := float64(t) * timeIncrement
-		sampleID := int(timeRegister)
+	for t := range len(y) / ch {
+		sampleID := int(float64(t) * timeIncrement)
 		offset := t % possibleOffsets
 
-		// computing left wing (because of the middle element)
+		// computing left wing including the middle element
 		iters := min(len(f.offsetWins[offset]), sampleID+1)
 		for i, weight := range f.offsetWins[offset][:iters] {
 			batchID := (sampleID - i) * ch
@@ -205,10 +208,10 @@ func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement f
 
 		// computing right wing
 		start := 0
-		iters = min(len(f.offsetWins[offset]), samplesLen-1-sampleID)
-		if offset == 0 {
+		if offset == 0 { // avoid counting the first element twice
 			start = 1
 		}
+		iters = min(len(f.offsetWins[offset]), samplesLen-1-sampleID)
 		iters = max(start, iters)
 		for i, weight := range f.offsetWins[offset][start:iters] {
 			batchID := (sampleID + i + 1) * ch
@@ -219,7 +222,7 @@ func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement f
 
 		batchID := t * ch
 		for s := range newSamples {
-			(*y)[batchID+s] = T(newSamples[s]) // TODO: proper rounding
+			y[batchID+s] = T(newSamples[s])
 			newSamples[s] = 0
 		}
 	}
