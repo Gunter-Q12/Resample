@@ -15,17 +15,26 @@ func optionCmp(a, b Option) int {
 	return b.precedence - a.precedence
 }
 
-func WithMemoryLimit(bytes int) Option {
+// WithNoMemoization function returns option that disables memoization in [Resampler].
+//
+// This option should be used when [Resampler] consumers too much memory.
+// Such behaviour may occur when resampling between
+// sampling rages with a small greatest common divisor (e.g. 9999 and 10000).
+//
+// Enabling this function slows the resampling progress significantly.
+// Therefore, Most users should avoid it and should switch used filter instead.
+// .
+func WithNoMemoization() Option {
 	return Option{
 		precedence: memoryLimitPrecedence,
 		apply: func(r *Resampler) error {
-			r.memLimit = bytes
+			r.isMemoization = false
 			return nil
 		},
 	}
 }
 
-// fileInfo stores info about precompiled filters
+// fileInfo stores info about precompiled filters.
 type filterInfo struct {
 	path     string
 	length   int
@@ -69,7 +78,7 @@ func WithLinearFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
-			r.f = newFilter(linearInfo, r.inRate, r.outRate, r.memLimit)
+			r.f = newFilter(linearInfo, r.inRate, r.outRate, r.isMemoization)
 			return nil
 		},
 	}
@@ -83,7 +92,7 @@ func WithKaiserFastestFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
-			r.f = newFilter(kaiserFastestInfo, r.inRate, r.outRate, r.memLimit)
+			r.f = newFilter(kaiserFastestInfo, r.inRate, r.outRate, r.isMemoization)
 			return nil
 		},
 	}
@@ -97,7 +106,7 @@ func WithKaiserFastFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
-			r.f = newFilter(kaiserFastInfo, r.inRate, r.outRate, r.memLimit)
+			r.f = newFilter(kaiserFastInfo, r.inRate, r.outRate, r.isMemoization)
 			return nil
 		},
 	}
@@ -111,7 +120,7 @@ func WithKaiserBestFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
-			r.f = newFilter(kaiserBestInfo, r.inRate, r.outRate, r.memLimit)
+			r.f = newFilter(kaiserBestInfo, r.inRate, r.outRate, r.isMemoization)
 			return nil
 		},
 	}

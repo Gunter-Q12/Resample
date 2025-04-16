@@ -17,7 +17,7 @@ type filter struct {
 	scale       float64
 }
 
-func newFilter(info filterInfo, inRate, outRate, memLimit int) *filter {
+func newFilter(info filterInfo, inRate, outRate int, memoization bool) *filter {
 	interpWin, err := readWindowFromFile(info.path, info.length)
 	if err != nil {
 		panic(fmt.Errorf("cannot open precompiled filter: %w", err))
@@ -47,7 +47,7 @@ func newFilter(info filterInfo, inRate, outRate, memLimit int) *filter {
 	// recalculating all the offsets
 	var precalcWins [][]float64
 	copies := outRate / gcd(inRate, outRate)
-	if memLimit >= 0 && copies*len(interpWin)*8 > memLimit {
+	if memoization {
 		return f
 	}
 	precalcWins = make([][]float64, copies)

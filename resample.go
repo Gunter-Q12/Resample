@@ -34,14 +34,14 @@ var formatElementSize = map[Format]int{
 }
 
 type Resampler struct {
-	outBuf   io.Writer
-	format   Format
-	inRate   int
-	outRate  int
-	ch       int
-	memLimit int
-	f        *filter
-	elemSize int
+	outBuf        io.Writer
+	format        Format
+	inRate        int
+	outRate       int
+	ch            int
+	isMemoization bool
+	f             *filter
+	elemSize      int
 }
 
 func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
@@ -53,12 +53,13 @@ func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	elemSize := formatElementSize[format]
 
 	resampler := &Resampler{
-		outBuf:   outBuffer,
-		format:   format,
-		inRate:   inRate,
-		outRate:  outRate,
-		ch:       ch,
-		elemSize: elemSize,
+		outBuf:        outBuffer,
+		format:        format,
+		inRate:        inRate,
+		outRate:       outRate,
+		ch:            ch,
+		isMemoization: true,
+		elemSize:      elemSize,
 	}
 
 	slices.SortFunc(options, optionCmp)
