@@ -167,10 +167,10 @@ func convolveWithPrecalc[T Number](f *filter, samples []T, timeIncrement float64
 
 		// computing left wing (because of the middle element)
 		iters := min(len(f.precalcWins[offset]), sampleId+1)
-		for i := range iters {
-			weight := f.precalcWins[offset][i]
+		for i, weight := range f.precalcWins[offset][:iters] {
+			batchId := (sampleId - i) * ch
 			for s := range newSamples {
-				newSamples[s] += weight * float64(samples[(sampleId-i)*ch+s])
+				newSamples[s] += weight * float64(samples[batchId+s])
 			}
 		}
 
@@ -182,14 +182,17 @@ func convolveWithPrecalc[T Number](f *filter, samples []T, timeIncrement float64
 		if offset == 0 {
 			start = 1
 		}
-		for i := start; i < iters; i++ {
-			weight := f.precalcWins[offset][i]
+		iters = max(start, iters)
+		for i, weight := range f.precalcWins[offset][start:iters] {
+			batchId := (sampleId + i + 1) * ch
 			for s := range newSamples {
-				newSamples[s] += weight * float64(samples[(sampleId+i+1)*ch+s])
+				newSamples[s] += weight * float64(samples[batchId+s])
 			}
 		}
+
+		batchId := t * ch
 		for s := range newSamples {
-			(*y)[t*ch+s] = T(newSamples[s]) // TODO: proper rounding
+			(*y)[batchId+s] = T(newSamples[s]) // TODO: proper rounding
 			newSamples[s] = 0
 		}
 	}
