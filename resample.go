@@ -127,7 +127,7 @@ func write[T number](r *Resampler, input []byte) (int, error) {
 		fSamples[i] = float64(s)
 	}
 
-	if r.f.precalcWins != nil {
+	if r.f.offsetWins != nil {
 		convolveWithPrecalc[T](r.f, fSamples, timeIncrement, r.ch, &result)
 	} else {
 		convolve[T](r.f, samples, timeIncrement, r.ch, &result)
@@ -179,15 +179,15 @@ func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement f
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
-	possibleOffsets := len(f.precalcWins)
+	possibleOffsets := len(f.offsetWins)
 	for t := range len(*y) / ch {
 		timeRegister := float64(t) * timeIncrement
 		sampleID := int(timeRegister)
 		offset := t % possibleOffsets
 
 		// computing left wing (because of the middle element)
-		iters := min(len(f.precalcWins[offset]), sampleID+1)
-		for i, weight := range f.precalcWins[offset][:iters] {
+		iters := min(len(f.offsetWins[offset]), sampleID+1)
+		for i, weight := range f.offsetWins[offset][:iters] {
 			batchID := (sampleID - i) * ch
 			for s := range newSamples {
 				newSamples[s] += weight * samples[batchID+s]
@@ -198,12 +198,12 @@ func convolveWithPrecalc[T number](f *filter, samples []float64, timeIncrement f
 
 		// computing right wing
 		start := 0
-		iters = min(len(f.precalcWins[offset]), samplesLen-1-sampleID)
+		iters = min(len(f.offsetWins[offset]), samplesLen-1-sampleID)
 		if offset == 0 {
 			start = 1
 		}
 		iters = max(start, iters)
-		for i, weight := range f.precalcWins[offset][start:iters] {
+		for i, weight := range f.offsetWins[offset][start:iters] {
 			batchID := (sampleID + i + 1) * ch
 			for s := range newSamples {
 				newSamples[s] += weight * samples[batchID+s]
