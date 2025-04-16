@@ -107,8 +107,13 @@ func write[T Number](r *Resampler, input []byte) (int, error) {
 
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
 
+	fSamples := make([]float64, len(samples))
+	for i, s := range samples {
+		fSamples[i] = float64(s)
+	}
+
 	if r.inRate < r.outRate {
-		convolveWithPrecalc[T](r.f, samples, timeIncrement, r.ch, &result)
+		convolveWithPrecalc[T](r.f, fSamples, timeIncrement, r.ch, &result)
 	} else {
 		convolve[T](r.f, samples, timeIncrement, r.ch, &result)
 	}
@@ -155,7 +160,8 @@ func convolve[T Number](f *filter, samples []T, timeIncrement float64, ch int, y
 		}
 	}
 }
-func convolveWithPrecalc[T Number](f *filter, samples []T, timeIncrement float64, ch int, y *[]T) {
+
+func convolveWithPrecalc[T Number](f *filter, samples []float64, timeIncrement float64, ch int, y *[]T) {
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
@@ -170,7 +176,7 @@ func convolveWithPrecalc[T Number](f *filter, samples []T, timeIncrement float64
 		for i, weight := range f.precalcWins[offset][:iters] {
 			batchId := (sampleId - i) * ch
 			for s := range newSamples {
-				newSamples[s] += weight * float64(samples[batchId+s])
+				newSamples[s] += weight * samples[batchId+s]
 			}
 		}
 
@@ -186,7 +192,7 @@ func convolveWithPrecalc[T Number](f *filter, samples []T, timeIncrement float64
 		for i, weight := range f.precalcWins[offset][start:iters] {
 			batchId := (sampleId + i + 1) * ch
 			for s := range newSamples {
-				newSamples[s] += weight * float64(samples[batchId+s])
+				newSamples[s] += weight * samples[batchId+s]
 			}
 		}
 
