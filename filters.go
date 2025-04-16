@@ -47,7 +47,7 @@ func newFilter(info filterInfo, inRate, outRate, memLimit int) *filter {
 	// recalculating all the offsets
 	var precalcWins [][]float64
 	copies := outRate / gcd(inRate, outRate)
-	if memLimit >= 0 && (copies+2)*len(interpWin)*8 > memLimit {
+	if memLimit >= 0 && copies*len(interpWin)*8 > memLimit {
 		return f
 	}
 	precalcWins = make([][]float64, copies)
@@ -61,6 +61,8 @@ func newFilter(info filterInfo, inRate, outRate, memLimit int) *filter {
 			precalcWins[i][j] = f.GetPoint(offset, j)
 		}
 	}
+	f.interpDelta = nil
+	f.interpWin = nil
 	f.precalcWins = precalcWins
 	return f
 }

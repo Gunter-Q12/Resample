@@ -24,12 +24,13 @@ const (
 	FormatFloat64
 )
 
+//nolint:mnd // map used as a constant
 var formatElementSize = map[Format]int{
-	FormatInt16:   2, //nolint:mnd // used as const
-	FormatInt32:   4, //nolint:mnd // used as const
-	FormatInt64:   8, //nolint:mnd // used as const
-	FormatFloat32: 4, //nolint:mnd // used as const
-	FormatFloat64: 8, //nolint:mnd // used as const
+	FormatInt16:   2,
+	FormatInt32:   4,
+	FormatInt64:   8,
+	FormatFloat32: 4,
+	FormatFloat64: 8,
 }
 
 type Resampler struct {
@@ -61,7 +62,6 @@ func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	}
 
 	slices.SortFunc(options, optionCmp)
-	// TODO: apply filter option last
 
 	for _, option := range options {
 		if err := option.apply(resampler); err != nil {

@@ -31,6 +31,7 @@ type filterInfo struct {
 	isScaled bool
 }
 
+//nolint:mnd // structs used as constants
 var (
 	linearInfo = filterInfo{
 		path:     "filters/linear_f64",
