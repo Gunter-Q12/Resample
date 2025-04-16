@@ -106,10 +106,9 @@ func newFilter(interpWin []float64, density, inRate, outRate int, isLinear bool)
 	}
 
 	var precalcWins [][]float64
-	if outRate > inRate {
+	if true {
 		// recalculating all the offsets
 		// TODO: limit space
-		// TODO: handle downsampling as well
 		copies := outRate / gcd(inRate, outRate)
 		precalcWins = make([][]float64, copies)
 		timeIncrement := float64(inRate) / float64(outRate)

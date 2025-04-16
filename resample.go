@@ -121,7 +121,7 @@ func write[T Number](r *Resampler, input []byte) (int, error) {
 		fSamples[i] = float64(s)
 	}
 
-	if r.inRate < r.outRate {
+	if r.f.precalcWins != nil {
 		convolveWithPrecalc[T](r.f, fSamples, timeIncrement, r.ch, &result)
 	} else {
 		convolve[T](r.f, samples, timeIncrement, r.ch, &result)
