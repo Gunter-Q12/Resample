@@ -44,7 +44,7 @@ func WithKaiserFastestFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
-			interpWin, err := readWindowFromFile("filters/kaiser_super_fast_f64", 385)
+			interpWin, err := readWindowFromFile("filters/kaiser_fastest_f64", 385)
 			if err != nil {
 				return fmt.Errorf("new kaiser best filter: %w", err)
 			}
