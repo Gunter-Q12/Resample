@@ -5,6 +5,7 @@ const (
 	memoryLimitPrecedence = 100
 )
 
+// Option is a struct used to configure [Resampler].
 type Option struct {
 	precedence int
 	apply      func(*Resampler) error
@@ -24,6 +25,7 @@ func WithMemoryLimit(bytes int) Option {
 	}
 }
 
+// fileInfo stores info about precompiled filters
 type filterInfo struct {
 	path     string
 	length   int
@@ -59,6 +61,10 @@ var (
 	}
 )
 
+// WithLinearFilter function returns option that configures [Resampler] to use linear filter.
+//
+// This option should be used only for testing purposes because linear filter provides
+// poor resampling quality.
 func WithLinearFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
@@ -69,6 +75,10 @@ func WithLinearFilter() Option {
 	}
 }
 
+// WithKaiserFastestFilter function returns option
+// that configures [Resampler] to use the fast Kaiser filter.
+//
+// Fastest Kaiser filter provides higher resampling speed in exchange for lower quality.
 func WithKaiserFastestFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
@@ -79,6 +89,10 @@ func WithKaiserFastestFilter() Option {
 	}
 }
 
+// WithKaiserFastFilter function returns option
+// that configures [Resampler] to use the best Kaiser filter.
+//
+// Best Kaiser filter provides higher resampling speed in exchange for lower quality.
 func WithKaiserFastFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
@@ -89,6 +103,10 @@ func WithKaiserFastFilter() Option {
 	}
 }
 
+// WithKaiserBestFilter function returns option
+// that configures [Resampler] to use the fastest Kaiser filter.
+//
+// Used by default.
 func WithKaiserBestFilter() Option {
 	return Option{
 		precedence: filterPrecedence,
