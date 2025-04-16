@@ -33,37 +33,39 @@ var formatElementSize = map[Format]int{
 	FormatFloat64: 8,
 }
 
+// A Resampler is an object that writes resampled data into an io.Writer.
 type Resampler struct {
-	outBuf        io.Writer
-	format        Format
-	inRate        int
-	outRate       int
-	ch            int
-	isMemoization bool
-	f             *filter
-	elemSize      int
+	outBuf      io.Writer
+	format      Format
+	inRate      int
+	outRate     int
+	ch          int
+	memoization bool
+	f           *filter
+	elemSize    int
 }
 
+// New creates a new Resampler.
+//
+// Default filter is kaiser fast filter, use WithXFilter options to change it.
+// Memoization is enabled by default, use WithNoMemoization function to disable it.
 func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	options ...Option) (*Resampler, error) {
 	if inRate <= 0 || outRate <= 0 || ch <= 0 {
 		return nil, errors.New("sampling rates and channel number must be greater than zero")
 	}
 
-	elemSize := formatElementSize[format]
-
 	resampler := &Resampler{
-		outBuf:        outBuffer,
-		format:        format,
-		inRate:        inRate,
-		outRate:       outRate,
-		ch:            ch,
-		isMemoization: true,
-		elemSize:      elemSize,
+		outBuf:      outBuffer,
+		format:      format,
+		inRate:      inRate,
+		outRate:     outRate,
+		ch:          ch,
+		memoization: true,
+		elemSize:    formatElementSize[format],
 	}
 
 	slices.SortFunc(options, optionCmp)
-
 	for _, option := range options {
 		if err := option.apply(resampler); err != nil {
 			return nil, err
@@ -71,7 +73,7 @@ func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	}
 
 	if resampler.f == nil {
-		if err := WithKaiserBestFilter().apply(resampler); err != nil {
+		if err := WithKaiserFastFilter().apply(resampler); err != nil {
 			return nil, err
 		}
 	}
@@ -105,42 +107,47 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	return int64(n), err
 }
 
+// write is an actual implementation of Write.
 func write[T number](r *Resampler, input []byte) (int, error) {
-	if r.inRate == r.outRate {
-		return r.outBuf.Write(input)
-	}
-
-	samples := make([]T, len(input)/r.elemSize)
-	err := binary.Read(bytes.NewReader(input), binary.LittleEndian, &samples)
+	samples, err := getSamples[T](input, r.elemSize)
 	if err != nil {
-		return 0, fmt.Errorf("resampler write: %w", err)
+		return 0, fmt.Errorf("resampler: write: %w", err)
 	}
 
 	n := len(samples) / r.ch
 	shape := int(float64(n) * float64(r.outRate) / float64(r.inRate))
 	result := make([]T, shape*r.ch)
-
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
 
-	fSamples := make([]float64, len(samples))
-	for i, s := range samples {
-		fSamples[i] = float64(s)
-	}
-
 	if r.f.offsetWins != nil {
-		convolveWithPrecalc[T](r.f, fSamples, timeIncrement, r.ch, &result)
+		convolveWithPrecalc[T](r.f, samples, timeIncrement, r.ch, &result)
 	} else {
 		convolve[T](r.f, samples, timeIncrement, r.ch, &result)
 	}
 
 	err = binary.Write(r.outBuf, binary.LittleEndian, result)
 	if err != nil {
-		return 0, fmt.Errorf("resampler write: %w", err)
+		return 0, fmt.Errorf("resampler: write: %w", err)
 	}
 	return len(input), nil
 }
 
-func convolve[T number](f *filter, samples []T, timeIncrement float64, ch int, y *[]T) {
+// getSamples reads input and converts it to a slice of floats.
+func getSamples[T number](input []byte, elemSize int) ([]float64, error) {
+	samples := make([]T, len(input)/elemSize)
+	err := binary.Read(bytes.NewReader(input), binary.LittleEndian, &samples)
+	if err != nil {
+		return nil, fmt.Errorf("getting samples: %w", err)
+	}
+
+	fSamples := make([]float64, len(samples))
+	for i, s := range samples {
+		fSamples[i] = float64(s)
+	}
+	return fSamples, nil
+}
+
+func convolve[T number](f *filter, samples []float64, timeIncrement float64, ch int, y *[]T) {
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
@@ -154,7 +161,7 @@ func convolve[T number](f *filter, samples []T, timeIncrement float64, ch int, y
 		for i := range iters {
 			weight := f.Value(offset, i)
 			for s := range newSamples {
-				newSamples[s] += weight * float64(samples[(sampleID-i)*ch+s])
+				newSamples[s] += weight * samples[(sampleID-i)*ch+s]
 			}
 		}
 
@@ -165,7 +172,7 @@ func convolve[T number](f *filter, samples []T, timeIncrement float64, ch int, y
 		for i := range iters {
 			weight := f.Value(offset, i)
 			for s := range newSamples {
-				newSamples[s] += weight * float64(samples[(sampleID+i+1)*ch+s])
+				newSamples[s] += weight * samples[(sampleID+i+1)*ch+s]
 			}
 		}
 		for s := range newSamples {

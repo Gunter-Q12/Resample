@@ -27,7 +27,7 @@ func WithNoMemoization() Option {
 	return Option{
 		precedence: memoizationPrecedence,
 		apply: func(r *Resampler) error {
-			r.isMemoization = false
+			r.memoization = false
 			return nil
 		},
 	}
@@ -106,7 +106,7 @@ func withFilter(info filterInfo) Option {
 	return Option{
 		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
-			r.f = newFilter(info, r.inRate, r.outRate, r.isMemoization)
+			r.f = newFilter(info, r.inRate, r.outRate, r.memoization)
 			return nil
 		},
 	}
