@@ -23,7 +23,6 @@ func optionCmp(a, b Option) int {
 //
 // Enabling this function slows the resampling progress significantly.
 // Therefore, Most users should avoid it and should switch used filter instead.
-// .
 func WithNoMemoization() Option {
 	return Option{
 		precedence: memoizationPrecedence,
@@ -75,13 +74,7 @@ var (
 // This option should be used only for testing purposes because linear filter provides
 // poor resampling quality.
 func WithLinearFilter() Option {
-	return Option{
-		precedence: filterPrecedence,
-		apply: func(r *Resampler) error {
-			r.f = newFilter(linearInfo, r.inRate, r.outRate, r.isMemoization)
-			return nil
-		},
-	}
+	return withFilter(linearInfo)
 }
 
 // WithKaiserFastestFilter function returns option
@@ -89,13 +82,7 @@ func WithLinearFilter() Option {
 //
 // Fastest Kaiser filter provides higher resampling speed in exchange for lower quality.
 func WithKaiserFastestFilter() Option {
-	return Option{
-		precedence: filterPrecedence,
-		apply: func(r *Resampler) error {
-			r.f = newFilter(kaiserFastestInfo, r.inRate, r.outRate, r.isMemoization)
-			return nil
-		},
-	}
+	return withFilter(kaiserFastestInfo)
 }
 
 // WithKaiserFastFilter function returns option
@@ -103,13 +90,7 @@ func WithKaiserFastestFilter() Option {
 //
 // Best Kaiser filter provides higher resampling speed in exchange for lower quality.
 func WithKaiserFastFilter() Option {
-	return Option{
-		precedence: filterPrecedence,
-		apply: func(r *Resampler) error {
-			r.f = newFilter(kaiserFastInfo, r.inRate, r.outRate, r.isMemoization)
-			return nil
-		},
-	}
+	return withFilter(kaiserFastInfo)
 }
 
 // WithKaiserBestFilter function returns option
@@ -117,10 +98,15 @@ func WithKaiserFastFilter() Option {
 //
 // Used by default.
 func WithKaiserBestFilter() Option {
+	return withFilter(kaiserBestInfo)
+}
+
+// withFilter is an actual implementation for all WithFilterX functions.
+func withFilter(info filterInfo) Option {
 	return Option{
 		precedence: filterPrecedence,
 		apply: func(r *Resampler) error {
-			r.f = newFilter(kaiserBestInfo, r.inRate, r.outRate, r.isMemoization)
+			r.f = newFilter(info, r.inRate, r.outRate, r.isMemoization)
 			return nil
 		},
 	}
