@@ -17,7 +17,7 @@ func optionCmp(a, b Option) int {
 	return b.precedence - a.precedence
 }
 
-func MemoryLimit(bytes int) Option {
+func WithMemoryLimit(bytes int) Option {
 	return Option{
 		precedence: 100,
 		apply: func(r *Resampler) error {
@@ -27,7 +27,7 @@ func MemoryLimit(bytes int) Option {
 	}
 }
 
-func LinearFilter() Option {
+func WithLinearFilter() Option {
 	return Option{
 		precedence: 50,
 		apply: func(r *Resampler) error {
@@ -37,7 +37,7 @@ func LinearFilter() Option {
 	}
 }
 
-func KaiserFastestFilter() Option {
+func WithKaiserFastestFilter() Option {
 	return Option{
 		precedence: 50,
 		apply: func(r *Resampler) error {
@@ -52,7 +52,7 @@ func KaiserFastestFilter() Option {
 	}
 }
 
-func KaiserFastFilter() Option {
+func WithKaiserFastFilter() Option {
 	return Option{
 		precedence: 50,
 		apply: func(r *Resampler) error {
@@ -67,7 +67,7 @@ func KaiserFastFilter() Option {
 	}
 }
 
-func KaiserBestFilter() Option {
+func WithKaiserBestFilter() Option {
 	return Option{
 		precedence: 50,
 		apply: func(r *Resampler) error {

@@ -25,17 +25,17 @@ func TestResamplerInt(t *testing.T) {
 	}{
 		{name: "in=out",
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
-			err: nil, ir: 1, or: 1, ch: 1, filter: LinearFilter()},
+			err: nil, ir: 1, or: 1, ch: 1, filter: WithLinearFilter()},
 		{name: "simplest upsampling case",
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
-			err: nil, ir: 1, or: 2, ch: 1, filter: LinearFilter()},
+			err: nil, ir: 1, or: 2, ch: 1, filter: WithLinearFilter()},
 		{name: "simplest downsampling case",
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
-			err: nil, ir: 2, or: 1, ch: 1, filter: LinearFilter()},
+			err: nil, ir: 2, or: 1, ch: 1, filter: WithLinearFilter()},
 		{name: "two channels",
 			input:  []int16{1, 11, 3, 13, 5, 15},
 			output: []int16{1, 11, 2, 12, 3, 13, 4, 14, 5, 15},
-			err:    nil, ir: 1, or: 2, ch: 2, filter: LinearFilter()},
+			err:    nil, ir: 1, or: 2, ch: 2, filter: WithLinearFilter()},
 	}
 	for _, tt := range resamplerTestInt16 {
 		t.Run(tt.name, func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestResamplerInt(t *testing.T) {
 		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
 
-		res, err := New(outBuf, FormatInt16, 1, 2, 1, LinearFilter())
+		res, err := New(outBuf, FormatInt16, 1, 2, 1, WithLinearFilter())
 		assert.NoError(t, err)
 
 		size, err := io.Copy(res, inBuf)
@@ -96,23 +96,23 @@ func TestResamplerFloat(t *testing.T) {
 		{name: "Linear downsampling",
 			input:  []float64{0, 0.25, 0.5, 0.75},
 			output: []float64{0, 1.0 / 3, 2.0 / 3},
-			err:    nil, ir: 4, or: 3, filter: LinearFilter()},
+			err:    nil, ir: 4, or: 3, filter: WithLinearFilter()},
 		{name: "Linear upsampling",
 			input:  []float64{1, 2, 3},
 			output: []float64{1, 1.5, 2, 2.5, 3},
-			err:    nil, ir: 2, or: 4, filter: LinearFilter()},
+			err:    nil, ir: 2, or: 4, filter: WithLinearFilter()},
 		{name: "KaiserFast downsampling",
 			input:  sine8000,
 			output: sine125,
-			err:    nil, ir: 8000, or: 125, filter: KaiserFastFilter()},
+			err:    nil, ir: 8000, or: 125, filter: WithKaiserFastFilter()},
 		{name: "KaiserFast uplampling",
 			input:  sine125,
 			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: KaiserFastFilter()},
+			err:    nil, ir: 125, or: 8000, filter: WithKaiserFastFilter()},
 		{name: "KaiserBest uplampling",
 			input:  sine125,
 			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: KaiserBestFilter()},
+			err:    nil, ir: 125, or: 8000, filter: WithKaiserBestFilter()},
 	}
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
@@ -145,7 +145,7 @@ func FuzzResampler(f *testing.F) {
 		}
 		samples := data[:len(data)/(2*ch)*(2*ch)]
 
-		res, err := New(io.Discard, FormatInt16, ir, or, ch, LinearFilter())
+		res, err := New(io.Discard, FormatInt16, ir, or, ch, WithLinearFilter())
 		if err != nil {
 			return
 		}
@@ -211,7 +211,7 @@ func Example_resamplingSlice() {
 
 	// Resample
 	outBuf := new(bytes.Buffer)
-	res, _ := New(outBuf, FormatInt16, 1, 2, 1, LinearFilter())
+	res, _ := New(outBuf, FormatInt16, 1, 2, 1, WithLinearFilter())
 	_, _ = res.Write(inputData.Bytes())
 
 	// Convert bytes back to a slice of values

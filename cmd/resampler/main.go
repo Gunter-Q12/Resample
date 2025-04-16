@@ -31,10 +31,10 @@ var flagToFormat = map[string]resample.Format{
 }
 
 var flagToFilter = map[string]resample.Option{
-	"linear":         resample.LinearFilter(),
-	"kaiser_fastest": resample.KaiserFastestFilter(),
-	"kaiser_fast":    resample.KaiserFastFilter(),
-	"kaiser_best":    resample.KaiserBestFilter(),
+	"linear":         resample.WithLinearFilter(),
+	"kaiser_fastest": resample.WithKaiserFastestFilter(),
+	"kaiser_fast":    resample.WithKaiserFastFilter(),
+	"kaiser_best":    resample.WithKaiserBestFilter(),
 }
 
 func main() {
@@ -77,7 +77,7 @@ func main() {
 
 	validateArgs()
 
-	res, err := resample.New(out, flagToFormat[*format], *ir, *or, *ch, flagToFilter[*q], resample.MemoryLimit(*ml))
+	res, err := resample.New(out, flagToFormat[*format], *ir, *or, *ch, flagToFilter[*q], resample.WithMemoryLimit(*ml))
 	if err != nil {
 		os.Remove(outputPath)
 		log.Fatalf("Error while creating a resampler: %s", err)

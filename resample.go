@@ -70,7 +70,7 @@ func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	}
 
 	if resampler.f == nil {
-		if err := KaiserBestFilter().apply(resampler); err != nil {
+		if err := WithKaiserBestFilter().apply(resampler); err != nil {
 			return nil, err
 		}
 	}
