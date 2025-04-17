@@ -6,7 +6,8 @@ stages:
 test:
   stage: test
   script:
-    - go test ./... -coverprofile=coverage-report.out
+    - go test ./...
+    - go test . -coverprofile=coverage-report.out
     - go tool cover -html=coverage-report.out -o coverage-report.html
     - go tool cover -func=coverage-report.out
   artifacts:
