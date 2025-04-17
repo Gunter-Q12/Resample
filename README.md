@@ -1,3 +1,6 @@
+# Resample
+
+[![Go Reference](https://pkg.go.dev/badge/gitlab.com/gunter-go/resample.svg)](https://pkg.go.dev/gitlab.com/gunter-go/resample)
 [![Go Report Card](https://goreportcard.com/badge/gitlab.com/gunter-go/resample)](https://goreportcard.com/report/gitlab.com/gunter-go/resample)
 ![coverage](https://gitlab.com/gunter-go/resample/badges/main/coverage.svg)
 ![pipeline](https://gitlab.com/gunter-go/resample/badges/main/pipeline.svg
