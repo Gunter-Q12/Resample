@@ -190,10 +190,10 @@ func convolveWithMemoization[T number](f *filter, samples []float64, timeIncreme
 	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
 
-	possibleOffsets := len(f.offsetWins)
+	offsetsNum := len(f.offsetWins)
 	for t := range len(y) / ch {
 		sampleID := int(float64(t) * timeIncrement)
-		offset := t % possibleOffsets
+		offset := t % offsetsNum
 
 		// computing left wing including the middle element
 		iters := min(len(f.offsetWins[offset]), sampleID+1)
@@ -204,7 +204,7 @@ func convolveWithMemoization[T number](f *filter, samples []float64, timeIncreme
 			}
 		}
 
-		offset = (possibleOffsets - offset) % possibleOffsets
+		offset = (offsetsNum - offset) % offsetsNum
 
 		// computing right wing
 		start := 0
