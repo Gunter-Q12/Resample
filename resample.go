@@ -126,7 +126,7 @@ func write[T number](r *Resampler, input []byte) (int, error) {
 	if r.memoization {
 		frameFunc = calcFrameWithMemoization
 	}
-	convolveWithMemoization[T](r.f, samples, result, frameFunc, timeIncrement, r.ch)
+	convolve[T](r.f, samples, result, frameFunc, timeIncrement, r.ch)
 
 	err = binary.Write(r.outBuf, binary.LittleEndian, result)
 	if err != nil {
@@ -150,7 +150,7 @@ func getSamples[T number](input []byte, elemSize int) ([]float64, error) {
 	return fSamples, nil
 }
 
-func convolveWithMemoization[T number](f *filter, samples []float64, y []T,
+func convolve[T number](f *filter, samples []float64, y []T,
 	frameCalc frameCalcFunc, timeIncrement float64, ch int) {
 	newSamples := make([]float64, ch)
 
@@ -182,34 +182,34 @@ type frameCalcFunc func(*filter, []float64, []float64, float64, int, int)
 
 func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int, ch int) {
 	// computing left wing including the middle element
-	samplesLen := len(samples) / ch
-	sampleID := int(inputTime)
-	offset := inputTime - float64(sampleID)
-	iters := min(f.Length(offset), sampleID+1)
+	batchNum := len(samples) / ch
+	middleBatch := int(inputTime)
+	offset := inputTime - float64(middleBatch)
+	iters := min(f.Length(offset), middleBatch+1)
 	for i := range iters {
 		weight := f.Value(offset, i)
-		batchID := (sampleID - i) * ch
+		startSample := (middleBatch - i) * ch
 		for s := range newSamples {
-			newSamples[s] += weight * samples[batchID+s]
+			newSamples[s] += weight * samples[startSample+s]
 		}
 	}
 
 	offset = 1 - offset
 
 	// computing right wing
-	iters = min(f.Length(offset), samplesLen-1-sampleID)
+	iters = min(f.Length(offset), batchNum-1-middleBatch)
 	for i := range iters {
 		weight := f.Value(offset, i)
-		batchID := (sampleID + i + 1) * ch
+		startSample := (middleBatch + i + 1) * ch
 		for s := range newSamples {
-			newSamples[s] += weight * samples[batchID+s]
+			newSamples[s] += weight * samples[startSample+s]
 		}
 	}
 }
 
 func calcFrameWithMemoization(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int, ch int) {
 	inputFrame := int(inputTime)
-	samplesLen := len(samples) / ch
+	batchNum := len(samples) / ch
 	offsetsNum := len(f.offsetWins)
 	offset := outputFrame % offsetsNum
 
@@ -229,7 +229,7 @@ func calcFrameWithMemoization(f *filter, samples, newSamples []float64, inputTim
 	if offset == 0 { // avoid counting the first element twice
 		start = 1
 	}
-	iters = min(len(f.offsetWins[offset]), samplesLen-1-inputFrame)
+	iters = min(len(f.offsetWins[offset]), batchNum-1-inputFrame)
 	iters = max(start, iters)
 	for i, weight := range f.offsetWins[offset][start:iters] {
 		startSample := (inputFrame + i + 1) * ch
