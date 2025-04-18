@@ -195,8 +195,8 @@ func convolve[T number](info convolutionInfo[T]) {
 				info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame, info.ch)
 
 				startSample := outputFrame * info.ch
-				for s := range newSamples {
-					info.output[startSample+s] = T(newSamples[s])
+				for s, sample := range newSamples {
+					info.output[startSample+s] = T(sample)
 					newSamples[s] = 0
 				}
 			}
