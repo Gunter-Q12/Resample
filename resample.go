@@ -192,7 +192,7 @@ func convolve[T number](info convolutionInfo[T]) {
 				outputFrame := startFrame + currFrame
 				inputTime := float64(outputFrame) * info.timeIncrement
 
-				info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame, info.ch)
+				info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame)
 
 				startSample := outputFrame * info.ch
 				for s, sample := range newSamples {
@@ -205,17 +205,20 @@ func convolve[T number](info convolutionInfo[T]) {
 	wg.Wait()
 }
 
-type frameCalcFunc func(*filter, []float64, []float64, float64, int, int)
+type frameCalcFunc func(*filter, []float64, []float64, float64, int)
 
-func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int, ch int) {
-	// computing left wing including the middle element
+func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int) {
+	ch := len(newSamples)
 	batchNum := len(samples) / ch
-	middleBatch := int(inputTime)
-	offset := inputTime - float64(middleBatch)
-	iters := min(f.Length(offset), middleBatch+1)
+
+	inputFrame := int(inputTime)
+	offset := inputTime - float64(inputFrame)
+
+	// computing left wing including the middle element
+	iters := min(f.Length(offset), inputFrame+1)
 	for i := range iters {
 		weight := f.Value(offset, i)
-		startSample := (middleBatch - i) * ch
+		startSample := (inputFrame - i) * ch
 		for s := range newSamples {
 			newSamples[s] += weight * samples[startSample+s]
 		}
@@ -224,20 +227,22 @@ func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, outp
 	offset = 1 - offset
 
 	// computing right wing
-	iters = min(f.Length(offset), batchNum-1-middleBatch)
+	iters = min(f.Length(offset), batchNum-1-inputFrame)
 	for i := range iters {
 		weight := f.Value(offset, i)
-		startSample := (middleBatch + i + 1) * ch
+		startSample := (inputFrame + i + 1) * ch
 		for s := range newSamples {
 			newSamples[s] += weight * samples[startSample+s]
 		}
 	}
 }
 
-func calcFrameWithMemoization(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int, ch int) {
-	inputFrame := int(inputTime)
+func calcFrameWithMemoization(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int) {
+	ch := len(newSamples)
 	batchNum := len(samples) / ch
+
 	offsetsNum := len(f.offsetWins)
+	inputFrame := int(inputTime)
 	offset := outputFrame % offsetsNum
 
 	// computing left wing including the middle element
