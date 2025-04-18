@@ -13,80 +13,70 @@ import (
 	"testing"
 )
 
+type testCase struct {
+	name   string
+	input  []int16
+	output []int16
+	err    error
+	ir     int
+	or     int
+	ch     int
+}
+
 func TestResamplerInt(t *testing.T) {
-	resamplerTestInt16 := []struct {
-		name   string
-		input  []int16
-		output []int16
-		err    error
-		ir     int
-		or     int
-		ch     int
-		filter resample.Option
-	}{
+	resamplerTestInt16 := []testCase{
 		{name: "in=out",
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
-			err: nil, ir: 1, or: 1, ch: 1, filter: resample.WithLinearFilter()},
+			err: nil, ir: 1, or: 1, ch: 1},
 		{name: "simplest upsampling case",
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
-			err: nil, ir: 1, or: 2, ch: 1, filter: resample.WithLinearFilter()},
+			err: nil, ir: 1, or: 2, ch: 1},
 		{name: "simplest downsampling case",
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
-			err: nil, ir: 2, or: 1, ch: 1, filter: resample.WithLinearFilter()},
+			err: nil, ir: 2, or: 1, ch: 1},
 		{name: "two channels",
 			input:  []int16{1, 11, 3, 13, 5, 15},
 			output: []int16{1, 11, 2, 12, 3, 13, 4, 14, 5, 15},
-			err:    nil, ir: 1, or: 2, ch: 2, filter: resample.WithLinearFilter()},
-	}
-	for _, tt := range resamplerTestInt16 {
-		t.Run(tt.name, func(t *testing.T) {
-			outBuf := new(bytes.Buffer)
-			inBuf := writeBuff(t, tt.input)
-
-			res, err := resample.New(outBuf, resample.FormatInt16, tt.ir, tt.or, tt.ch, tt.filter)
-			require.NoError(t, err)
-
-			_, err = res.Write(inBuf.Bytes())
-			if tt.err != nil {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				output := readBuff[int16](t, outBuf)
-				assert.Equal(t, tt.output, output[:len(tt.output)])
-			}
-		})
+			err:    nil, ir: 1, or: 2, ch: 2},
 	}
 
-	for _, tt := range resamplerTestInt16 {
-		t.Run(tt.name+" with no memo", func(t *testing.T) {
-			outBuf := new(bytes.Buffer)
-			inBuf := writeBuff(t, tt.input)
+	for _, tc := range resamplerTestInt16 {
+		testInt16(t, "Memoization", tc, resample.WithLinearFilter())
+	}
 
-			res, err := resample.New(outBuf, resample.FormatInt16, tt.ir, tt.or, tt.ch, tt.filter,
-				resample.WithNoMemoization())
-			require.NoError(t, err)
-
-			_, err = res.Write(inBuf.Bytes())
-			if tt.err != nil {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				output := readBuff[int16](t, outBuf)
-				assert.Equal(t, tt.output, output[:len(tt.output)])
-			}
-		})
+	for _, tc := range resamplerTestInt16 {
+		testInt16(t, "No Memoization", tc, resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
 
 	t.Run("io.Copy", func(t *testing.T) {
-		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
-
 		res, err := resample.New(outBuf, resample.FormatInt16, 1, 2, 1, resample.WithLinearFilter())
 		require.NoError(t, err)
 
-		size, err := io.Copy(res, inBuf)
+		inBuf := bufferize(t, []int16{1, 3, 5})
+		_, err = io.Copy(res, inBuf)
+
 		require.NoError(t, err)
-		assert.EqualValues(t, 6, size)
+		output := debufferize[int16](t, outBuf)
+		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[:5])
+	})
+}
+
+func testInt16(t *testing.T, nameSuffix string, tc testCase, options ...resample.Option) {
+	t.Run(fmt.Sprintf("%s + %s", tc.name, nameSuffix), func(t *testing.T) {
+		outBuf := new(bytes.Buffer)
+		res, err := resample.New(outBuf, resample.FormatInt16, tc.ir, tc.or, tc.ch, options...)
+		require.NoError(t, err)
+
+		_, err = res.Write(bufferize(t, tc.input).Bytes())
+
+		if tc.err != nil {
+			assert.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			output := debufferize[int16](t, outBuf)
+			assert.Equal(t, tc.output, output[:len(tc.output)])
+		}
 	})
 }
 
@@ -94,16 +84,12 @@ func TestResamplerFloat(t *testing.T) {
 	ch := 1
 
 	file, err := os.Open("./testdata/sine_8000_3_f64_ch1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	sine8000 := readBuff[float64](t, file)
+	require.NoError(t, err)
+	sine8000 := debufferize[float64](t, file)
 
 	file, err = os.Open("./testdata/sine_125_3_f64_ch1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	sine125 := readBuff[float64](t, file)
+	require.NoError(t, err)
+	sine125 := debufferize[float64](t, file)
 
 	resamplerTestFloat64 := []struct {
 		name   string
@@ -138,7 +124,7 @@ func TestResamplerFloat(t *testing.T) {
 	for _, tt := range resamplerTestFloat64 {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
-			inBuf := writeBuff(t, tt.input)
+			inBuf := bufferize(t, tt.input)
 
 			res, err := resample.New(outBuf, resample.FormatFloat64, tt.ir, tt.or, ch, tt.filter)
 			require.NoError(t, err)
@@ -148,7 +134,7 @@ func TestResamplerFloat(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				output := readBuff[float64](t, outBuf)
+				output := debufferize[float64](t, outBuf)
 				if len(output) > 20 {
 					assert.InDeltaSlicef(t, tt.output[10:10], output[10:10], .0001, "output: %v", output)
 				} else {
@@ -192,7 +178,7 @@ func BenchmarkWrite(b *testing.B) {
 	}
 }
 
-func writeBuff(t testing.TB, values any) *bytes.Buffer {
+func bufferize(t testing.TB, values any) *bytes.Buffer {
 	inBuf := new(bytes.Buffer)
 	err := binary.Write(inBuf, binary.LittleEndian, values)
 	if err != nil {
@@ -201,7 +187,7 @@ func writeBuff(t testing.TB, values any) *bytes.Buffer {
 	return inBuf
 }
 
-func readBuff[T any](t testing.TB, buff io.Reader) []T {
+func debufferize[T any](t testing.TB, buff io.Reader) []T {
 	t.Helper()
 	var v T
 	elemSize := int(reflect.TypeOf(v).Size())
