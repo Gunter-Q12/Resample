@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"golang.org/x/exp/constraints"
 	"io"
+	"runtime"
 	"slices"
 )
+
+const routinesPerCore = 4
 
 type number interface {
 	constraints.Float | constraints.Integer
@@ -191,39 +194,51 @@ func convolveWithMemoization[T number](f *filter, samples []float64, timeIncreme
 	newSamples := make([]float64, ch)
 
 	offsetsNum := len(f.offsetWins)
-	for t := range len(y) / ch {
-		sampleID := int(float64(t) * timeIncrement)
-		offset := t % offsetsNum
 
-		// computing left wing including the middle element
-		iters := min(len(f.offsetWins[offset]), sampleID+1)
-		for i, weight := range f.offsetWins[offset][:iters] {
-			batchID := (sampleID - i) * ch
-			for s := range newSamples {
-				newSamples[s] += weight * samples[batchID+s]
+	routines := runtime.NumCPU() * routinesPerCore
+	frames := len(y) / ch
+	framesPerRoutine := frames / routines
+	if framesPerRoutine == 0 {
+		routines = 1
+		framesPerRoutine = frames
+	}
+
+	for startFrame := 0; startFrame < frames; startFrame += framesPerRoutine {
+		for currFrame := range min(framesPerRoutine, frames-startFrame) {
+			frame := startFrame + currFrame
+			middleFrame := int(float64(frame) * timeIncrement)
+			offset := frame % offsetsNum
+
+			// computing left wing including the middle element
+			iters := min(len(f.offsetWins[offset]), middleFrame+1)
+			for i, weight := range f.offsetWins[offset][:iters] {
+				startSample := (middleFrame - i) * ch
+				for s := range newSamples {
+					newSamples[s] += weight * samples[startSample+s]
+				}
 			}
-		}
 
-		offset = (offsetsNum - offset) % offsetsNum
+			offset = (offsetsNum - offset) % offsetsNum
 
-		// computing right wing
-		start := 0
-		if offset == 0 { // avoid counting the first element twice
-			start = 1
-		}
-		iters = min(len(f.offsetWins[offset]), samplesLen-1-sampleID)
-		iters = max(start, iters)
-		for i, weight := range f.offsetWins[offset][start:iters] {
-			batchID := (sampleID + i + 1) * ch
-			for s := range newSamples {
-				newSamples[s] += weight * samples[batchID+s]
+			// computing right wing
+			start := 0
+			if offset == 0 { // avoid counting the first element twice
+				start = 1
 			}
-		}
+			iters = min(len(f.offsetWins[offset]), samplesLen-1-middleFrame)
+			iters = max(start, iters)
+			for i, weight := range f.offsetWins[offset][start:iters] {
+				startSample := (middleFrame + i + 1) * ch
+				for s := range newSamples {
+					newSamples[s] += weight * samples[startSample+s]
+				}
+			}
 
-		batchID := t * ch
-		for s := range newSamples {
-			y[batchID+s] = T(newSamples[s])
-			newSamples[s] = 0
+			startSample := frame * ch
+			for s := range newSamples {
+				y[startSample+s] = T(newSamples[s])
+				newSamples[s] = 0
+			}
 		}
 	}
 }
