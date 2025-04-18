@@ -1,8 +1,8 @@
 # Resample
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/Gunter-Q12/Resample.svg)](https://pkg.go.dev/github.com/Gunter-Q12/Resample)
-[![Go Report Card](https://goreportcard.com/badge/gitlab.com/gunter-go/resample)](https://goreportcard.com/report/gitlab.com/gunter-go/resample)
-![coverage](https://gitlab.com/gunter-go/resample/badges/main/coverage.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Gunter-Q12/Resample)](https://goreportcard.com/report/github.com/Gunter-Q12/Resample)
+[![cov](https://Gunter-Q12.github.io/Resample/badges/coverage.svg)](https://github.com/Gunter-Q12/Resample/actions)
 ![pipeline](https://gitlab.com/gunter-go/resample/badges/main/pipeline.svg
 )
 
