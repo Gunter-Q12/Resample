@@ -123,7 +123,9 @@ func write[T number](r *Resampler, input []byte) (int, error) {
 	timeIncrement := float64(r.inRate) / float64(r.outRate)
 
 	if r.memoization {
-		convolveWithMemoization[T](r.f, samples, timeIncrement, r.ch, result)
+		convolveWithMemoization[T](
+			r.f, samples, result, calcFrameWithMemoization, timeIncrement, r.ch,
+		)
 	} else {
 		convolve[T](r.f, samples, timeIncrement, r.ch, result)
 	}
@@ -189,7 +191,8 @@ func convolve[T number](f *filter, samples []float64, timeIncrement float64, ch 
 	}
 }
 
-func convolveWithMemoization[T number](f *filter, samples []float64, timeIncrement float64, ch int, y []T) {
+func convolveWithMemoization[T number](f *filter, samples []float64, y []T,
+	frameCalc frameCalcFunc, timeIncrement float64, ch int) {
 	newSamples := make([]float64, ch)
 
 	routines := runtime.NumCPU() * routinesPerCore
@@ -205,7 +208,7 @@ func convolveWithMemoization[T number](f *filter, samples []float64, timeIncreme
 			outputFrame := startFrame + currFrame
 			inputFrame := int(float64(outputFrame) * timeIncrement)
 
-			calcFrameWithMemoization(f, samples, outputFrame, inputFrame, ch, newSamples)
+			frameCalc(f, samples, newSamples, outputFrame, inputFrame, ch)
 
 			startSample := outputFrame * ch
 			for s := range newSamples {
@@ -216,7 +219,9 @@ func convolveWithMemoization[T number](f *filter, samples []float64, timeIncreme
 	}
 }
 
-func calcFrameWithMemoization(f *filter, samples []float64, outputFrame int, inputFrame int, ch int, newSamples []float64) {
+type frameCalcFunc func(*filter, []float64, []float64, int, int, int)
+
+func calcFrameWithMemoization(f *filter, samples, newSamples []float64, outputFrame int, inputFrame int, ch int) {
 	samplesLen := len(samples) / ch
 	offsetsNum := len(f.offsetWins)
 	offset := outputFrame % offsetsNum
