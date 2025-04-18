@@ -1,4 +1,4 @@
-module gitlab.com/gunter-go/resample
+module github.com/gunter-q12/resample
 
 go 1.23.2
 

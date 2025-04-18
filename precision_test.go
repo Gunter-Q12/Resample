@@ -2,8 +2,8 @@ package resample_test
 
 import (
 	"bytes"
+	"github.com/gunter-q12/resample"
 	"github.com/stretchr/testify/require"
-	"gitlab.com/gunter-go/resample"
 	"io"
 	"os"
 	"testing"
