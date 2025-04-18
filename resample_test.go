@@ -57,6 +57,26 @@ func TestResamplerInt(t *testing.T) {
 		})
 	}
 
+	for _, tt := range resamplerTestInt16 {
+		t.Run(tt.name+" with no memo", func(t *testing.T) {
+			outBuf := new(bytes.Buffer)
+			inBuf := writeBuff(t, tt.input)
+
+			res, err := resample.New(outBuf, resample.FormatInt16, tt.ir, tt.or, tt.ch, tt.filter,
+				resample.WithNoMemoization())
+			require.NoError(t, err)
+
+			_, err = res.Write(inBuf.Bytes())
+			if tt.err != nil {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				output := readBuff[int16](t, outBuf)
+				assert.Equal(t, tt.output, output[:len(tt.output)])
+			}
+		})
+	}
+
 	t.Run("io.Copy", func(t *testing.T) {
 		inBuf := writeBuff(t, []int16{1, 2, 3})
 		outBuf := new(bytes.Buffer)
