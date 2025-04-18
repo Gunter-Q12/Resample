@@ -190,10 +190,7 @@ func convolve[T number](f *filter, samples []float64, timeIncrement float64, ch 
 }
 
 func convolveWithMemoization[T number](f *filter, samples []float64, timeIncrement float64, ch int, y []T) {
-	samplesLen := len(samples) / ch
 	newSamples := make([]float64, ch)
-
-	offsetsNum := len(f.offsetWins)
 
 	routines := runtime.NumCPU() * routinesPerCore
 	frames := len(y) / ch
@@ -205,40 +202,47 @@ func convolveWithMemoization[T number](f *filter, samples []float64, timeIncreme
 
 	for startFrame := 0; startFrame < frames; startFrame += framesPerRoutine {
 		for currFrame := range min(framesPerRoutine, frames-startFrame) {
-			frame := startFrame + currFrame
-			middleFrame := int(float64(frame) * timeIncrement)
-			offset := frame % offsetsNum
+			outputFrame := startFrame + currFrame
+			inputFrame := int(float64(outputFrame) * timeIncrement)
 
-			// computing left wing including the middle element
-			iters := min(len(f.offsetWins[offset]), middleFrame+1)
-			for i, weight := range f.offsetWins[offset][:iters] {
-				startSample := (middleFrame - i) * ch
-				for s := range newSamples {
-					newSamples[s] += weight * samples[startSample+s]
-				}
-			}
+			calcFrameWithMemoization(f, samples, outputFrame, inputFrame, ch, newSamples)
 
-			offset = (offsetsNum - offset) % offsetsNum
-
-			// computing right wing
-			start := 0
-			if offset == 0 { // avoid counting the first element twice
-				start = 1
-			}
-			iters = min(len(f.offsetWins[offset]), samplesLen-1-middleFrame)
-			iters = max(start, iters)
-			for i, weight := range f.offsetWins[offset][start:iters] {
-				startSample := (middleFrame + i + 1) * ch
-				for s := range newSamples {
-					newSamples[s] += weight * samples[startSample+s]
-				}
-			}
-
-			startSample := frame * ch
+			startSample := outputFrame * ch
 			for s := range newSamples {
 				y[startSample+s] = T(newSamples[s])
 				newSamples[s] = 0
 			}
+		}
+	}
+}
+
+func calcFrameWithMemoization(f *filter, samples []float64, outputFrame int, inputFrame int, ch int, newSamples []float64) {
+	samplesLen := len(samples) / ch
+	offsetsNum := len(f.offsetWins)
+	offset := outputFrame % offsetsNum
+
+	// computing left wing including the middle element
+	iters := min(len(f.offsetWins[offset]), inputFrame+1)
+	for i, weight := range f.offsetWins[offset][:iters] {
+		startSample := (inputFrame - i) * ch
+		for s := range newSamples {
+			newSamples[s] += weight * samples[startSample+s]
+		}
+	}
+
+	offset = (offsetsNum - offset) % offsetsNum
+
+	// computing right wing
+	start := 0
+	if offset == 0 { // avoid counting the first element twice
+		start = 1
+	}
+	iters = min(len(f.offsetWins[offset]), samplesLen-1-inputFrame)
+	iters = max(start, iters)
+	for i, weight := range f.offsetWins[offset][start:iters] {
+		startSample := (inputFrame + i + 1) * ch
+		for s := range newSamples {
+			newSamples[s] += weight * samples[startSample+s]
 		}
 	}
 }
