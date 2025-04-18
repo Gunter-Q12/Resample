@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"gitlab.com/gunter-go/resample"
+	"github.com/gunter-q12/resample"
 	"io"
 	"log"
 	"os"
