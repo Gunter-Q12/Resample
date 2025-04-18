@@ -110,6 +110,16 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	return int64(n), err
 }
 
+type convolutionInfo[T number] struct {
+	f             *filter
+	frameFunc     frameCalcFunc
+	timeIncrement float64
+	ch            int
+
+	samples []float64
+	output  []T
+}
+
 // write is an actual implementation of Write.
 func write[T number](r *Resampler, input []byte) (int, error) {
 	samples, err := getSamples[T](input, r.elemSize)
@@ -117,18 +127,26 @@ func write[T number](r *Resampler, input []byte) (int, error) {
 		return 0, fmt.Errorf("resampler: write: %w", err)
 	}
 
-	n := len(samples) / r.ch
-	shape := int(float64(n) * float64(r.outRate) / float64(r.inRate))
-	result := make([]T, shape*r.ch)
-	timeIncrement := float64(r.inRate) / float64(r.outRate)
+	inFrames := len(samples) / r.ch
+	outFrames := int(float64(inFrames) * float64(r.outRate) / float64(r.inRate))
+	outSamples := outFrames * r.ch
 
-	frameFunc := calcFrame
-	if r.memoization {
-		frameFunc = calcFrameWithMemoization
+	info := convolutionInfo[T]{
+		f:             r.f,
+		frameFunc:     calcFrame,
+		timeIncrement: float64(r.inRate) / float64(r.outRate),
+		ch:            r.ch,
+
+		samples: samples,
+		output:  make([]T, outSamples),
 	}
-	convolve[T](r.f, samples, result, frameFunc, timeIncrement, r.ch)
+	if r.memoization {
+		info.frameFunc = calcFrameWithMemoization
+	}
 
-	err = binary.Write(r.outBuf, binary.LittleEndian, result)
+	convolve[T](info)
+
+	err = binary.Write(r.outBuf, binary.LittleEndian, info.output)
 	if err != nil {
 		return 0, fmt.Errorf("resampler: write: %w", err)
 	}
@@ -150,12 +168,11 @@ func getSamples[T number](input []byte, elemSize int) ([]float64, error) {
 	return fSamples, nil
 }
 
-func convolve[T number](f *filter, samples []float64, y []T,
-	frameCalc frameCalcFunc, timeIncrement float64, ch int) {
-	newSamples := make([]float64, ch)
+func convolve[T number](info convolutionInfo[T]) {
+	newSamples := make([]float64, info.ch)
 
 	routines := runtime.NumCPU() * routinesPerCore
-	frames := len(y) / ch
+	frames := len(info.output) / info.ch
 	framesPerRoutine := frames / routines
 	if framesPerRoutine == 0 {
 		routines = 1
@@ -165,13 +182,13 @@ func convolve[T number](f *filter, samples []float64, y []T,
 	for startFrame := 0; startFrame < frames; startFrame += framesPerRoutine {
 		for currFrame := range min(framesPerRoutine, frames-startFrame) {
 			outputFrame := startFrame + currFrame
-			inputTime := float64(outputFrame) * timeIncrement
+			inputTime := float64(outputFrame) * info.timeIncrement
 
-			frameCalc(f, samples, newSamples, inputTime, outputFrame, ch)
+			info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame, info.ch)
 
-			startSample := outputFrame * ch
+			startSample := outputFrame * info.ch
 			for s := range newSamples {
-				y[startSample+s] = T(newSamples[s])
+				info.output[startSample+s] = T(newSamples[s])
 				newSamples[s] = 0
 			}
 		}
