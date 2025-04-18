@@ -9,6 +9,7 @@ import (
 	"io"
 	"runtime"
 	"slices"
+	"sync"
 )
 
 const routinesPerCore = 4
@@ -169,8 +170,6 @@ func getSamples[T number](input []byte, elemSize int) ([]float64, error) {
 }
 
 func convolve[T number](info convolutionInfo[T]) {
-	newSamples := make([]float64, info.ch)
-
 	routines := runtime.NumCPU() * routinesPerCore
 	frames := len(info.output) / info.ch
 	framesPerRoutine := frames / routines
@@ -179,20 +178,31 @@ func convolve[T number](info convolutionInfo[T]) {
 		framesPerRoutine = frames
 	}
 
-	for startFrame := 0; startFrame < frames; startFrame += framesPerRoutine {
-		for currFrame := range min(framesPerRoutine, frames-startFrame) {
-			outputFrame := startFrame + currFrame
-			inputTime := float64(outputFrame) * info.timeIncrement
+	allNewSamples := make([]float64, routines*info.ch)
 
-			info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame, info.ch)
+	wg := sync.WaitGroup{}
+	for i := range routines {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			startFrame := framesPerRoutine * i
+			batchSize := min(framesPerRoutine, frames-startFrame)
+			newSamples := allNewSamples[i*info.ch : (i+1)*info.ch]
+			for currFrame := range batchSize {
+				outputFrame := startFrame + currFrame
+				inputTime := float64(outputFrame) * info.timeIncrement
 
-			startSample := outputFrame * info.ch
-			for s := range newSamples {
-				info.output[startSample+s] = T(newSamples[s])
-				newSamples[s] = 0
+				info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame, info.ch)
+
+				startSample := outputFrame * info.ch
+				for s := range newSamples {
+					info.output[startSample+s] = T(newSamples[s])
+					newSamples[s] = 0
+				}
 			}
-		}
+		}()
 	}
+	wg.Wait()
 }
 
 type frameCalcFunc func(*filter, []float64, []float64, float64, int, int)
