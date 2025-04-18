@@ -7,16 +7,22 @@ import (
 	"github.com/gunter-q12/resample"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/constraints"
 	"io"
 	"os"
 	"reflect"
 	"testing"
 )
 
-type testCase struct {
+type number interface {
+	constraints.Float | constraints.Integer
+}
+
+type testCase[T number] struct {
 	name   string
-	input  []int16
-	output []int16
+	format resample.Format
+	input  []T
+	output []T
 	err    error
 	ir     int
 	or     int
@@ -24,28 +30,28 @@ type testCase struct {
 }
 
 func TestResamplerInt(t *testing.T) {
-	resamplerTestInt16 := []testCase{
-		{name: "in=out",
+	int16TestCases := []testCase[int16]{
+		{name: "in=out", format: resample.FormatInt16,
 			input: []int16{1, 2, 3}, output: []int16{1, 2, 3},
 			err: nil, ir: 1, or: 1, ch: 1},
-		{name: "simplest upsampling case",
+		{name: "simplest upsampling case", format: resample.FormatInt16,
 			input: []int16{1, 3, 5}, output: []int16{1, 2, 3, 4, 5},
 			err: nil, ir: 1, or: 2, ch: 1},
-		{name: "simplest downsampling case",
+		{name: "simplest downsampling case", format: resample.FormatInt16,
 			input: []int16{1, 2, 3, 4, 5}, output: []int16{1, 3},
 			err: nil, ir: 2, or: 1, ch: 1},
-		{name: "two channels",
+		{name: "two channels", format: resample.FormatInt16,
 			input:  []int16{1, 11, 3, 13, 5, 15},
 			output: []int16{1, 11, 2, 12, 3, 13, 4, 14, 5, 15},
 			err:    nil, ir: 1, or: 2, ch: 2},
 	}
 
-	for _, tc := range resamplerTestInt16 {
-		testInt16(t, "Memoization", tc, resample.WithLinearFilter())
+	for _, tc := range int16TestCases {
+		runTestCase(t, "Memoization", tc, 0.001, resample.WithLinearFilter())
 	}
 
-	for _, tc := range resamplerTestInt16 {
-		testInt16(t, "No Memoization", tc, resample.WithLinearFilter(), resample.WithNoMemoization())
+	for _, tc := range int16TestCases {
+		runTestCase(t, "No Memoization", tc, 0.001, resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
 
 	t.Run("io.Copy", func(t *testing.T) {
@@ -62,10 +68,11 @@ func TestResamplerInt(t *testing.T) {
 	})
 }
 
-func testInt16(t *testing.T, nameSuffix string, tc testCase, options ...resample.Option) {
+func runTestCase[T number](t *testing.T, nameSuffix string, tc testCase[T],
+	delta float64, options ...resample.Option) {
 	t.Run(fmt.Sprintf("%s + %s", tc.name, nameSuffix), func(t *testing.T) {
 		outBuf := new(bytes.Buffer)
-		res, err := resample.New(outBuf, resample.FormatInt16, tc.ir, tc.or, tc.ch, options...)
+		res, err := resample.New(outBuf, tc.format, tc.ir, tc.or, tc.ch, options...)
 		require.NoError(t, err)
 
 		_, err = res.Write(bufferize(t, tc.input).Bytes())
@@ -74,8 +81,8 @@ func testInt16(t *testing.T, nameSuffix string, tc testCase, options ...resample
 			assert.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			output := debufferize[int16](t, outBuf)
-			assert.Equal(t, tc.output, output[:len(tc.output)])
+			output := debufferize[T](t, outBuf)
+			assert.InDeltaSlicef(t, tc.output, output[:len(tc.output)], delta, "output: %v", output)
 		}
 	})
 }
@@ -91,42 +98,41 @@ func TestResamplerFloat(t *testing.T) {
 	require.NoError(t, err)
 	sine125 := debufferize[float64](t, file)
 
-	resamplerTestFloat64 := []struct {
-		name   string
-		input  []float64
-		output []float64
-		err    error
-		ir     int
-		or     int
-		filter resample.Option
-	}{
-		{name: "Linear downsampling",
+	linearTestCases := []testCase[float64]{
+		{name: "downsampling", format: resample.FormatFloat64,
 			input:  []float64{0, 0.25, 0.5, 0.75},
 			output: []float64{0, 1.0 / 3, 2.0 / 3},
-			err:    nil, ir: 4, or: 3, filter: resample.WithLinearFilter()},
-		{name: "Linear upsampling",
+			err:    nil, ir: 4, or: 3, ch: 1},
+		{name: "upsampling", format: resample.FormatFloat64,
 			input:  []float64{1, 2, 3},
 			output: []float64{1, 1.5, 2, 2.5, 3},
-			err:    nil, ir: 2, or: 4, filter: resample.WithLinearFilter()},
-		{name: "KaiserFast downsampling",
+			err:    nil, ir: 2, or: 4, ch: 1},
+	}
+
+	for _, tc := range linearTestCases {
+		runTestCase(t, "Memoization", tc, 0.001, resample.WithLinearFilter())
+	}
+	for _, tc := range linearTestCases {
+		runTestCase(t, "No Memoization", tc, 0.001, resample.WithLinearFilter(), resample.WithNoMemoization())
+	}
+
+	// TODO: test fastest and best filters as well
+	kaiserTestCases := []testCase[float64]{
+		{name: "downsampling", format: resample.FormatFloat64,
 			input:  sine8000,
 			output: sine125,
-			err:    nil, ir: 8000, or: 125, filter: resample.WithKaiserFastFilter()},
-		{name: "KaiserFast uplampling",
+			err:    nil, ir: 8000, or: 125, ch: 1},
+		{name: "uplampling", format: resample.FormatFloat64,
 			input:  sine125,
 			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: resample.WithKaiserFastFilter()},
-		{name: "KaiserBest uplampling",
-			input:  sine125,
-			output: sine8000,
-			err:    nil, ir: 125, or: 8000, filter: resample.WithKaiserBestFilter()},
+			err:    nil, ir: 125, or: 8000, ch: 1},
 	}
-	for _, tt := range resamplerTestFloat64 {
+	for _, tt := range kaiserTestCases {
 		t.Run(tt.name, func(t *testing.T) {
 			outBuf := new(bytes.Buffer)
 			inBuf := bufferize(t, tt.input)
 
-			res, err := resample.New(outBuf, resample.FormatFloat64, tt.ir, tt.or, ch, tt.filter)
+			res, err := resample.New(outBuf, resample.FormatFloat64, tt.ir, tt.or, ch, resample.WithKaiserFastFilter())
 			require.NoError(t, err)
 
 			_, err = res.Write(inBuf.Bytes())
@@ -136,6 +142,7 @@ func TestResamplerFloat(t *testing.T) {
 				require.NoError(t, err)
 				output := debufferize[float64](t, outBuf)
 				if len(output) > 20 {
+					// TODO: this compares nothing
 					assert.InDeltaSlicef(t, tt.output[10:10], output[10:10], .0001, "output: %v", output)
 				} else {
 					assert.InDeltaSlicef(t, tt.output, output[:len(tt.output)], .0001, "output: %v", output)
