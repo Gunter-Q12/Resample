@@ -12,11 +12,11 @@ import (
 func TestResamplerPrecision(t *testing.T) {
 	music48Data, err := os.Open("./testdata/speech_sample_mono44.1kHz16bit.raw")
 	require.NoError(t, err)
-	music48 := readBuff[int16](t, music48Data)
+	music48 := unBuffer[int16](t, music48Data)
 
 	music16Data, err := os.Open("./testdata/speech_sample_mono14.7kHz16bit.raw")
 	require.NoError(t, err)
-	music16 := readBuff[int16](t, music16Data)
+	music16 := unBuffer[int16](t, music16Data)
 
 	t.Run("Upsample", func(t *testing.T) {
 		_, err = music16Data.Seek(0, io.SeekStart)
@@ -28,7 +28,7 @@ func TestResamplerPrecision(t *testing.T) {
 
 		_, err = io.Copy(resampler, music16Data)
 		require.NoError(t, err)
-		music48Res := readBuff[int16](t, out)
+		music48Res := unBuffer[int16](t, out)
 		music48Res = music48Res[:len(music48Res)-2]
 
 		t.Logf("original len: %d, resampled len: %d", len(music48), len(music48Res))
@@ -44,7 +44,7 @@ func TestResamplerPrecision(t *testing.T) {
 
 		_, err = io.Copy(resampler, music48Data)
 		require.NoError(t, err)
-		music16Res := readBuff[int16](t, out)
+		music16Res := unBuffer[int16](t, out)
 
 		t.Logf("original len: %d, resampled len: %d", len(music16[:len(music16Res)]), len(music16Res))
 		stats(t, music16[:len(music16Res)], music16Res)

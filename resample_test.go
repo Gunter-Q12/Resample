@@ -59,30 +59,22 @@ func TestResamplerInt(t *testing.T) {
 		res, err := resample.New(outBuf, resample.FormatInt16, 1, 2, 1, resample.WithLinearFilter())
 		require.NoError(t, err)
 
-		inBuf := bufferize(t, []int16{1, 3, 5})
+		inBuf := buffer(t, []int16{1, 3, 5})
 		_, err = io.Copy(res, inBuf)
 
 		require.NoError(t, err)
-		output := debufferize[int16](t, outBuf)
+		output := unBuffer[int16](t, outBuf)
 		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[:5])
 	})
 }
 
 func TestResamplerFloat(t *testing.T) {
-	file, err := os.Open("./testdata/sine_8000_3_f64_ch1")
-	require.NoError(t, err)
-	sine8000 := debufferize[float64](t, file)
-
-	file, err = os.Open("./testdata/sine_125_3_f64_ch1")
-	require.NoError(t, err)
-	sine125 := debufferize[float64](t, file)
-
 	linearTestCases := []testCase[float64]{
-		{name: "downsampling", format: resample.FormatFloat64,
+		{name: "simple downsampling", format: resample.FormatFloat64,
 			input:  []float64{0, 0.25, 0.5, 0.75},
 			output: []float64{0, 1.0 / 3, 2.0 / 3},
 			err:    nil, ir: 4, or: 3, ch: 1},
-		{name: "upsampling", format: resample.FormatFloat64,
+		{name: "simple upsampling", format: resample.FormatFloat64,
 			input:  []float64{1, 2, 3},
 			output: []float64{1, 1.5, 2, 2.5, 3},
 			err:    nil, ir: 2, or: 4, ch: 1},
@@ -94,40 +86,67 @@ func TestResamplerFloat(t *testing.T) {
 	for _, tc := range linearTestCases {
 		runTestCase(t, "No Memoization", tc, 0.001, resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
+}
+
+func TestResampleFloatKaiser(t *testing.T) {
+	file, err := os.Open("./testdata/sine_8000_3_f64_ch1")
+	require.NoError(t, err)
+	sine8000 := unBuffer[float64](t, file)
+
+	file, err = os.Open("./testdata/sine_125_3_f64_ch1")
+	require.NoError(t, err)
+	sine125 := unBuffer[float64](t, file)
 
 	kaiserTestCases := []testCase[float64]{
-		{name: "downsampling", format: resample.FormatFloat64,
+		{name: "sine downsampling", format: resample.FormatFloat64,
 			input:  sine8000,
 			output: sine125,
 			err:    nil, ir: 8000, or: 125, ch: 1},
-		{name: "uplampling", format: resample.FormatFloat64,
+		{name: "sine uplampling", format: resample.FormatFloat64,
 			input:  sine125,
 			output: sine8000,
 			err:    nil, ir: 125, or: 8000, ch: 1},
 	}
-	for _, tc := range kaiserTestCases {
-		runTestCase(
-			t, "fast and memoization", tc, 0.01,
-			resample.WithKaiserFastFilter(), resample.WithNoMemoization(),
-		)
+	filters := []struct {
+		name string
+		f    resample.Option
+	}{
+		{"fastest", resample.WithKaiserFastestFilter()},
+		{"fast", resample.WithKaiserFastFilter()},
+		{"best", resample.WithKaiserBestFilter()},
 	}
 
+	for _, tc := range kaiserTestCases {
+		for _, f := range filters {
+			runTestCase(
+				t, "memoization "+f.name, tc, 0.01, f.f,
+			)
+		}
+	}
+
+	for _, tc := range kaiserTestCases {
+		for _, f := range filters {
+			runTestCase(
+				t, "no memoization "+f.name, tc, 0.01, f.f,
+			)
+		}
+	}
 }
 
 func runTestCase[T number](t *testing.T, nameSuffix string, tc testCase[T],
 	delta float64, options ...resample.Option) {
-	t.Run(fmt.Sprintf("%s + %s", tc.name, nameSuffix), func(t *testing.T) {
+	t.Run(fmt.Sprintf("%s %s", tc.name, nameSuffix), func(t *testing.T) {
 		outBuf := new(bytes.Buffer)
 		res, err := resample.New(outBuf, tc.format, tc.ir, tc.or, tc.ch, options...)
 		require.NoError(t, err)
 
-		_, err = res.Write(bufferize(t, tc.input).Bytes())
+		_, err = res.Write(buffer(t, tc.input).Bytes())
 
 		if tc.err != nil {
 			assert.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			output := debufferize[T](t, outBuf)
+			output := unBuffer[T](t, outBuf)
 			commonLen := min(len(output), len(tc.output))
 			assert.InDeltaSlicef(
 				t, tc.output[:commonLen], output[:commonLen], delta,
@@ -170,7 +189,7 @@ func BenchmarkWrite(b *testing.B) {
 	}
 }
 
-func bufferize(t testing.TB, values any) *bytes.Buffer {
+func buffer(t testing.TB, values any) *bytes.Buffer {
 	inBuf := new(bytes.Buffer)
 	err := binary.Write(inBuf, binary.LittleEndian, values)
 	if err != nil {
@@ -179,7 +198,7 @@ func bufferize(t testing.TB, values any) *bytes.Buffer {
 	return inBuf
 }
 
-func debufferize[T any](t testing.TB, buff io.Reader) []T {
+func unBuffer[T any](t testing.TB, buff io.Reader) []T {
 	t.Helper()
 	var v T
 	elemSize := int(reflect.TypeOf(v).Size())
