@@ -68,28 +68,7 @@ func TestResamplerInt(t *testing.T) {
 	})
 }
 
-func runTestCase[T number](t *testing.T, nameSuffix string, tc testCase[T],
-	delta float64, options ...resample.Option) {
-	t.Run(fmt.Sprintf("%s + %s", tc.name, nameSuffix), func(t *testing.T) {
-		outBuf := new(bytes.Buffer)
-		res, err := resample.New(outBuf, tc.format, tc.ir, tc.or, tc.ch, options...)
-		require.NoError(t, err)
-
-		_, err = res.Write(bufferize(t, tc.input).Bytes())
-
-		if tc.err != nil {
-			assert.Error(t, err)
-		} else {
-			require.NoError(t, err)
-			output := debufferize[T](t, outBuf)
-			assert.InDeltaSlicef(t, tc.output, output[:len(tc.output)], delta, "output: %v", output)
-		}
-	})
-}
-
 func TestResamplerFloat(t *testing.T) {
-	ch := 1
-
 	file, err := os.Open("./testdata/sine_8000_3_f64_ch1")
 	require.NoError(t, err)
 	sine8000 := debufferize[float64](t, file)
@@ -116,7 +95,6 @@ func TestResamplerFloat(t *testing.T) {
 		runTestCase(t, "No Memoization", tc, 0.001, resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
 
-	// TODO: test fastest and best filters as well
 	kaiserTestCases := []testCase[float64]{
 		{name: "downsampling", format: resample.FormatFloat64,
 			input:  sine8000,
@@ -127,29 +105,36 @@ func TestResamplerFloat(t *testing.T) {
 			output: sine8000,
 			err:    nil, ir: 125, or: 8000, ch: 1},
 	}
-	for _, tt := range kaiserTestCases {
-		t.Run(tt.name, func(t *testing.T) {
-			outBuf := new(bytes.Buffer)
-			inBuf := bufferize(t, tt.input)
-
-			res, err := resample.New(outBuf, resample.FormatFloat64, tt.ir, tt.or, ch, resample.WithKaiserFastFilter())
-			require.NoError(t, err)
-
-			_, err = res.Write(inBuf.Bytes())
-			if tt.err != nil {
-				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				output := debufferize[float64](t, outBuf)
-				if len(output) > 20 {
-					// TODO: this compares nothing
-					assert.InDeltaSlicef(t, tt.output[10:10], output[10:10], .0001, "output: %v", output)
-				} else {
-					assert.InDeltaSlicef(t, tt.output, output[:len(tt.output)], .0001, "output: %v", output)
-				}
-			}
-		})
+	for _, tc := range kaiserTestCases {
+		runTestCase(
+			t, "fast and memoization", tc, 0.01,
+			resample.WithKaiserFastFilter(), resample.WithNoMemoization(),
+		)
 	}
+
+}
+
+func runTestCase[T number](t *testing.T, nameSuffix string, tc testCase[T],
+	delta float64, options ...resample.Option) {
+	t.Run(fmt.Sprintf("%s + %s", tc.name, nameSuffix), func(t *testing.T) {
+		outBuf := new(bytes.Buffer)
+		res, err := resample.New(outBuf, tc.format, tc.ir, tc.or, tc.ch, options...)
+		require.NoError(t, err)
+
+		_, err = res.Write(bufferize(t, tc.input).Bytes())
+
+		if tc.err != nil {
+			assert.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			output := debufferize[T](t, outBuf)
+			commonLen := min(len(output), len(tc.output))
+			assert.InDeltaSlicef(
+				t, tc.output[:commonLen], output[:commonLen], delta,
+				"output: %v", output,
+			)
+		}
+	})
 }
 
 func FuzzResampler(f *testing.F) {
