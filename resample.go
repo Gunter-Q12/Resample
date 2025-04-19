@@ -172,7 +172,7 @@ func getSamples[T number](input []byte, elemSize int) ([]float64, error) {
 func convolve[T number](info convolutionInfo[T]) {
 	routines := runtime.NumCPU() * routinesPerCore
 	frames := len(info.output) / info.ch
-	framesPerRoutine := frames / routines
+	framesPerRoutine := (frames + routines - 1) / routines
 	if framesPerRoutine == 0 {
 		routines = 1
 		framesPerRoutine = frames
