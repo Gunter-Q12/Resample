@@ -166,17 +166,15 @@ func check[T number](t *testing.T, nameSuffix string, tc testCase[T],
 }
 
 func FuzzResampler(f *testing.F) {
-	f.Fuzz(func(_ *testing.T, data []byte, ir, or, ch int) {
-		if ch <= 0 {
-			ch = -ch + 1
-		}
-		samples := data[:len(data)/(2*ch)*(2*ch)]
-
-		res, err := resample.New(io.Discard, resample.FormatInt16, ir, or, ch, resample.WithLinearFilter())
+	f.Fuzz(func(t *testing.T, data []byte, ir, or, ch int) {
+		res, err := resample.New(io.Discard, resample.FormatInt16, ir, or, ch, resample.WithKaiserFastestFilter())
 		if err != nil {
 			return
 		}
-		_, _ = res.Write(samples)
+		_, err = res.Write(data)
+		if err != nil {
+			t.Error()
+		}
 	})
 }
 
