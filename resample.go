@@ -173,7 +173,7 @@ func convolve[T number](info convolutionInfo[T]) {
 	routines := runtime.NumCPU() * routinesPerCore
 	frames := len(info.output) / info.ch
 	framesPerRoutine := (frames + routines - 1) / routines
-	if framesPerRoutine == 0 {
+	if frames < routines {
 		routines = 1
 		framesPerRoutine = frames
 	}
