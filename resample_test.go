@@ -47,11 +47,11 @@ func TestResamplerInt(t *testing.T) {
 	}
 
 	for _, tc := range int16TestCases {
-		runTestCase(t, "Memoization", tc, 0.001, resample.WithLinearFilter())
+		check(t, "Memoization", tc, inDelta[int16](0.001), resample.WithLinearFilter())
 	}
 
 	for _, tc := range int16TestCases {
-		runTestCase(t, "No Memoization", tc, 0.001, resample.WithLinearFilter(), resample.WithNoMemoization())
+		check(t, "No Memoization", tc, inDelta[int16](0.001), resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
 
 	t.Run("io.Copy", func(t *testing.T) {
@@ -81,10 +81,10 @@ func TestResamplerFloat(t *testing.T) {
 	}
 
 	for _, tc := range linearTestCases {
-		runTestCase(t, "Memoization", tc, 0.001, resample.WithLinearFilter())
+		check(t, "Memoization", tc, inDelta[float64](0.001), resample.WithLinearFilter())
 	}
 	for _, tc := range linearTestCases {
-		runTestCase(t, "No Memoization", tc, 0.001, resample.WithLinearFilter(), resample.WithNoMemoization())
+		check(t, "No Memoization", tc, inDelta[float64](0.001), resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
 }
 
@@ -118,23 +118,36 @@ func TestResampleFloatKaiser(t *testing.T) {
 
 	for _, tc := range kaiserTestCases {
 		for _, f := range filters {
-			runTestCase(
-				t, "memoization "+f.name, tc, 0.01, f.f,
+			check(
+				t, "memoization "+f.name, tc, inDelta[float64](0.01), f.f,
 			)
 		}
 	}
 
 	for _, tc := range kaiserTestCases {
 		for _, f := range filters {
-			runTestCase(
-				t, "no memoization "+f.name, tc, 0.01, f.f,
+			check(
+				t, "no memoization "+f.name, tc, inDelta[float64](0.01), f.f,
 			)
 		}
 	}
 }
 
-func runTestCase[T number](t *testing.T, nameSuffix string, tc testCase[T],
-	delta float64, options ...resample.Option) {
+type checker[T number] func(t *testing.T, expected, actual []T)
+
+func inDelta[T number](delta float64) checker[T] {
+	return func(t *testing.T, expected, actual []T) {
+		t.Helper()
+		commonLen := min(len(expected), len(actual))
+		assert.InDeltaSlicef(
+			t, expected[:commonLen], actual[:commonLen], delta,
+			"actual: %v", actual,
+		)
+	}
+}
+
+func check[T number](t *testing.T, nameSuffix string, tc testCase[T],
+	checker checker[T], options ...resample.Option) {
 	t.Run(fmt.Sprintf("%s %s", tc.name, nameSuffix), func(t *testing.T) {
 		outBuf := new(bytes.Buffer)
 		res, err := resample.New(outBuf, tc.format, tc.ir, tc.or, tc.ch, options...)
@@ -146,12 +159,8 @@ func runTestCase[T number](t *testing.T, nameSuffix string, tc testCase[T],
 			assert.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			output := unBuffer[T](t, outBuf)
-			commonLen := min(len(output), len(tc.output))
-			assert.InDeltaSlicef(
-				t, tc.output[:commonLen], output[:commonLen], delta,
-				"output: %v", output,
-			)
+			got := unBuffer[T](t, outBuf)
+			checker(t, tc.output, got)
 		}
 	})
 }

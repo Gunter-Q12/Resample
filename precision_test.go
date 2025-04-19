@@ -1,10 +1,9 @@
 package resample_test
 
 import (
-	"bytes"
 	"github.com/gunter-q12/resample"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io"
 	"os"
 	"testing"
 )
@@ -18,52 +17,56 @@ func TestResamplerPrecision(t *testing.T) {
 	require.NoError(t, err)
 	music16 := unBuffer[int16](t, music16Data)
 
-	t.Run("Upsample", func(t *testing.T) {
-		_, err = music16Data.Seek(0, io.SeekStart)
-		require.NoError(t, err)
+	testCases := []testCase[int16]{
+		{name: "upsampling", format: resample.FormatInt16,
+			input:  music16,
+			output: music48,
+			err:    nil, ir: 16000, or: 48000, ch: 1},
+		{name: "downsampling", format: resample.FormatInt16,
+			input:  music48,
+			output: music16,
+			err:    nil, ir: 48000, or: 16000, ch: 1},
+	}
 
-		out := new(bytes.Buffer)
-		resampler, err := resample.New(out, resample.FormatInt16, 16000, 48000, 1)
-		require.NoError(t, err)
+	filters := []struct {
+		name string
+		f    resample.Option
+	}{
+		{"fastest", resample.WithKaiserFastestFilter()},
+		{"fast", resample.WithKaiserFastFilter()},
+		{"best", resample.WithKaiserBestFilter()},
+	}
 
-		_, err = io.Copy(resampler, music16Data)
-		require.NoError(t, err)
-		music48Res := unBuffer[int16](t, out)
-		music48Res = music48Res[:len(music48Res)-2]
-
-		t.Logf("original len: %d, resampled len: %d", len(music48), len(music48Res))
-		stats(t, music48, music48Res)
-	})
-
-	t.Run("Downsample", func(t *testing.T) {
-		_, err = music48Data.Seek(0, io.SeekStart)
-		require.NoError(t, err)
-		out := new(bytes.Buffer)
-		resampler, err := resample.New(out, resample.FormatInt16, 48000, 16000, 1)
-		require.NoError(t, err)
-
-		_, err = io.Copy(resampler, music48Data)
-		require.NoError(t, err)
-		music16Res := unBuffer[int16](t, out)
-
-		t.Logf("original len: %d, resampled len: %d", len(music16[:len(music16Res)]), len(music16Res))
-		stats(t, music16[:len(music16Res)], music16Res)
-	})
+	for _, tc := range testCases {
+		for _, f := range filters {
+			check(t, "memoization "+f.name, tc, avgDelta[int16](90), f.f)
+		}
+	}
+	for _, tc := range testCases {
+		for _, f := range filters {
+			check(
+				t, "no memoization "+f.name, tc, avgDelta[int16](90), f.f,
+				resample.WithNoMemoization(),
+			)
+		}
+	}
 }
 
-func stats(t testing.TB, expected, actual []int16) {
-	t.Helper()
-	require.Len(t, expected, len(actual))
+func avgDelta[T number](delta float64) checker[T] {
+	return func(t *testing.T, expected, actual []T) {
+		t.Helper()
+		commonLen := min(len(expected), len(actual))
 
-	var avgDelta int
-	for i := range expected {
-		delta := actual[i] - expected[i]
-		if delta < 0 {
-			delta = -delta
+		var actualDelta float64
+		for i := range expected[:commonLen] {
+			delta := actual[i] - expected[i]
+			if delta < 0 {
+				delta = -delta
+			}
+			actualDelta += float64(delta)
 		}
-		avgDelta += int(delta)
+		actualDelta /= float64(commonLen)
+
+		assert.LessOrEqual(t, actualDelta, delta)
 	}
-	avgDelta /= len(expected)
-	t.Logf("avg delta: %d", avgDelta)
-	require.LessOrEqual(t, avgDelta, 90)
 }
