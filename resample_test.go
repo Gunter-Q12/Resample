@@ -54,7 +54,10 @@ func TestResamplerInt(t *testing.T) {
 		check(t, "No Memoization", tc, inDelta[int16](0.001), resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
 
-	t.Run("io.Copy", func(t *testing.T) {
+}
+
+func TestIOCopy(t *testing.T) {
+	t.Run("small", func(t *testing.T) {
 		outBuf := new(bytes.Buffer)
 		res, err := resample.New(outBuf, resample.FormatInt16, 1, 2, 1, resample.WithLinearFilter())
 		require.NoError(t, err)
@@ -65,6 +68,29 @@ func TestResamplerInt(t *testing.T) {
 		require.NoError(t, err)
 		output := unBuffer[int16](t, outBuf)
 		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[:5])
+	})
+
+	t.Run("big", func(t *testing.T) {
+		speech44Data, err := os.Open("./testdata/speech_sample_mono44.1kHz16bit.raw")
+		require.NoError(t, err)
+
+		speech14Data, err := os.Open("./testdata/speech_sample_mono14.7kHz16bit.raw")
+		require.NoError(t, err)
+		speech14 := unBuffer[int16](t, speech14Data)
+
+		outBuf := new(bytes.Buffer)
+		res, err := resample.New(
+			outBuf, resample.FormatInt16, 44100, 14700, 1,
+			resample.WithKaiserFastFilter(),
+		)
+		require.NoError(t, err)
+
+		_, err = io.Copy(res, speech44Data)
+		require.NoError(t, err)
+
+		output := unBuffer[int16](t, outBuf)
+		assert.InDelta(t, len(speech14), len(output), 10)
+		avgDelta[int16](24)(t, speech14, output)
 	})
 }
 
