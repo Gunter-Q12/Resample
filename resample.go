@@ -207,7 +207,7 @@ func convolve[T number](info convolutionInfo[T]) {
 
 type frameCalcFunc func(*filter, []float64, []float64, float64, int)
 
-func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int) {
+func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, _ int) {
 	ch := len(newSamples)
 	batchNum := len(samples) / ch
 

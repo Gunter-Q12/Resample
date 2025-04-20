@@ -8,11 +8,6 @@ import (
 	"testing"
 )
 
-type filterCase struct {
-	name string
-	f    resample.Option
-}
-
 func TestResamplerPrecisionSpeech(t *testing.T) {
 	speech44Data, err := os.Open("./testdata/speech_sample_mono44.1kHz16bit.raw")
 	require.NoError(t, err)
@@ -97,7 +92,7 @@ func TestResamplerPrecisionSpeech(t *testing.T) {
 }
 
 // precision values were acquired from experiments with Resampy library
-// that implements the same interpolation method
+// that implements the same interpolation method.
 func TestResamplerPrecisionMusic(t *testing.T) {
 	music48Data, err := os.Open("./testdata/music_sample_mono48kHz16bit.raw")
 	require.NoError(t, err)

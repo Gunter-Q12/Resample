@@ -53,7 +53,6 @@ func TestResamplerInt(t *testing.T) {
 	for _, tc := range int16TestCases {
 		check(t, "No Memoization", tc, inDelta[int16](0.001), resample.WithLinearFilter(), resample.WithNoMemoization())
 	}
-
 }
 
 func TestIOCopy(t *testing.T) {
