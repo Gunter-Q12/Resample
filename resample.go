@@ -175,10 +175,11 @@ type convolver[T number] struct {
 	r             *Resampler
 	frameFunc     frameCalcFunc[T]
 	timeIncrement float64
+	processed     int
 
-	samples   []float64
-	output    []T
-	processed int
+	convBuffer []float64
+	samples    []float64
+	output     []T
 }
 
 func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
@@ -187,11 +188,12 @@ func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
 	outSamples := outFrames * r.ch
 
 	c := &convolver[T]{
-		r: r,
-
+		r:             r,
 		timeIncrement: float64(r.inRate) / float64(r.outRate),
-		samples:       make([]float64, maxInputSize/r.elemSize),
-		output:        make([]T, outSamples),
+
+		convBuffer: make([]float64, runtime.NumCPU()*routinesPerCore),
+		samples:    make([]float64, maxInputSize/r.elemSize),
+		output:     make([]T, outSamples),
 	}
 
 	c.frameFunc = c.calcFrame
@@ -253,8 +255,6 @@ func (c *convolver[T]) convolve(startSample int) {
 		framesPerRoutine = frames
 	}
 
-	allNewSamples := make([]float64, routines*ch)
-
 	wg := sync.WaitGroup{}
 	for i := range routines {
 		wg.Add(1)
@@ -262,7 +262,7 @@ func (c *convolver[T]) convolve(startSample int) {
 			defer wg.Done()
 			startFrame := framesPerRoutine * i
 			batchSize := min(framesPerRoutine, frames-startFrame)
-			newSamples := allNewSamples[i*ch : (i+1)*ch]
+			newSamples := c.convBuffer[i*ch : (i+1)*ch]
 			for currFrame := range batchSize {
 				outputFrame := startFrame + currFrame
 				inputTime := float64(outputFrame) * c.timeIncrement
