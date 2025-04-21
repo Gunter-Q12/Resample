@@ -87,17 +87,18 @@ func TestResamplerPrecisionSpeech(t *testing.T) {
 			tc.tc, avgDelta[int16](tc.precision), tc.filter,
 		)
 	}
-	// TODO: disable memoization
-	//for _, tc := range testCases {
-	//	checkIOCopy(
-	//		t, "no memoization "+tc.nameSuffix,
-	//		tc.tc, avgDelta[int16](tc.precision), tc.filter,
-	//	)
-	//	check(
-	//		t, "no memoization "+tc.nameSuffix,
-	//		tc.tc, avgDelta[int16](tc.precision), tc.filter,
-	//	)
-	//}
+	for _, tc := range testCases {
+		checkIOCopy(
+			t, "no memoization "+tc.nameSuffix,
+			tc.tc, avgDelta[int16](tc.precision), tc.filter,
+			resample.WithNoMemoization(),
+		)
+		check(
+			t, "no memoization "+tc.nameSuffix,
+			tc.tc, avgDelta[int16](tc.precision), tc.filter,
+			resample.WithNoMemoization(),
+		)
+	}
 }
 
 // precision values were acquired from experiments with Resampy library
@@ -179,16 +180,18 @@ func TestResamplerPrecisionMusic(t *testing.T) {
 			tc.tc, avgDelta[int16](tc.precision), tc.filter,
 		)
 	}
-	//for _, tc := range testCases {
-	//	checkIOCopy(
-	//		t, "no memoization "+tc.nameSuffix,
-	//		tc.tc, avgDelta[int16](tc.precision), tc.filter,
-	//	)
-	//	check(
-	//		t, "no memoization "+tc.nameSuffix,
-	//		tc.tc, avgDelta[int16](tc.precision), tc.filter,
-	//	)
-	//}
+	for _, tc := range testCases {
+		checkIOCopy(
+			t, "no memoization "+tc.nameSuffix,
+			tc.tc, avgDelta[int16](tc.precision), tc.filter,
+			resample.WithNoMemoization(),
+		)
+		check(
+			t, "no memoization "+tc.nameSuffix,
+			tc.tc, avgDelta[int16](tc.precision), tc.filter,
+			resample.WithNoMemoization(),
+		)
+	}
 }
 
 func avgDelta[T number](delta float64) checker[T] {

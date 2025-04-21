@@ -269,8 +269,9 @@ func calcFrame[T number](f *filter, samples, newSamples []float64, inputTime flo
 	ch := len(newSamples)
 	batchNum := len(samples) / ch
 
-	inputFrame := int(inputTime) - info.processedSamples + (info.startSample / info.ch)
-	offset := inputTime - float64(inputFrame)
+	inputFrame := int(inputTime) + (info.startSample / info.ch)
+	offset := inputTime + float64(info.processedSamples/info.ch)*info.timeIncrement
+	offset = offset - float64(int(offset))
 
 	// computing left wing including the middle element
 	iters := min(f.Length(offset), inputFrame+1)
