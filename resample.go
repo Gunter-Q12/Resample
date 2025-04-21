@@ -176,11 +176,9 @@ type convolver[T number] struct {
 	frameFunc     frameCalcFunc[T]
 	timeIncrement float64
 
-	startSample int
-	endSample   int
-	samples     []float64
-	output      []T
-	processed   int
+	samples   []float64
+	output    []T
+	processed int
 }
 
 func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
@@ -211,15 +209,15 @@ func (c *convolver[T]) resample(input []byte, start, end int) (int, error) {
 		return 0, fmt.Errorf("resampler: resample: %w", err)
 	}
 
-	c.startSample = start / c.r.elemSize
-	c.endSample = end / c.r.elemSize
+	startSample := start / c.r.elemSize
+	endSample := end / c.r.elemSize
 
-	inFrames := (c.endSample - c.startSample) / c.r.ch
+	inFrames := (endSample - startSample) / c.r.ch
 	outFrames := int(float64(inFrames*c.r.outRate) / float64(c.r.inRate))
 	outSamples := outFrames * c.r.ch
 	c.output = c.output[:outSamples]
 
-	c.convolve()
+	c.convolve(startSample)
 
 	err = binary.Write(c.r.outBuf, binary.LittleEndian, c.output[:outSamples])
 	if err != nil {
@@ -245,16 +243,17 @@ func (c *convolver[T]) parseSamples(input []byte) error {
 	return nil
 }
 
-func (c *convolver[T]) convolve() {
+func (c *convolver[T]) convolve(startSample int) {
+	ch := c.r.ch
 	routines := runtime.NumCPU() * routinesPerCore
-	frames := len(c.output) / c.r.ch
+	frames := len(c.output) / ch
 	framesPerRoutine := (frames + routines - 1) / routines
 	if frames < routines {
 		routines = 1
 		framesPerRoutine = frames
 	}
 
-	allNewSamples := make([]float64, routines*c.r.ch)
+	allNewSamples := make([]float64, routines*ch)
 
 	wg := sync.WaitGroup{}
 	for i := range routines {
@@ -263,14 +262,15 @@ func (c *convolver[T]) convolve() {
 			defer wg.Done()
 			startFrame := framesPerRoutine * i
 			batchSize := min(framesPerRoutine, frames-startFrame)
-			newSamples := allNewSamples[i*c.r.ch : (i+1)*c.r.ch]
+			newSamples := allNewSamples[i*ch : (i+1)*ch]
 			for currFrame := range batchSize {
 				outputFrame := startFrame + currFrame
 				inputTime := float64(outputFrame) * c.timeIncrement
+				inputFrame := int(inputTime) + (startSample / ch)
 
-				c.frameFunc(newSamples, inputTime, outputFrame)
+				c.frameFunc(newSamples, inputTime, inputFrame, outputFrame)
 
-				startSample := outputFrame * c.r.ch
+				startSample := outputFrame * ch
 				for s, sample := range newSamples {
 					c.output[startSample+s] = T(sample)
 					newSamples[s] = 0
@@ -281,14 +281,15 @@ func (c *convolver[T]) convolve() {
 	wg.Wait()
 }
 
-type frameCalcFunc[T number] func([]float64, float64, int)
+type frameCalcFunc[T number] func([]float64, float64, int, int)
 
-func (c *convolver[T]) calcFrame(newSamples []float64, inputTime float64, _ int) {
+func (c *convolver[T]) calcFrame(
+	newSamples []float64, inputTime float64, inputFrame, _ int,
+) {
 	f := c.r.f
 	ch := c.r.ch
 	batchNum := len(c.samples) / ch
 
-	inputFrame := int(inputTime) + (c.startSample / ch)
 	offset := inputTime + float64(c.processed/ch)*c.timeIncrement
 	offset = offset - float64(int(offset))
 
@@ -316,14 +317,13 @@ func (c *convolver[T]) calcFrame(newSamples []float64, inputTime float64, _ int)
 }
 
 func (c *convolver[T]) calcFrameWithMemoization(
-	newSamples []float64, inputTime float64, outputFrame int,
+	newSamples []float64, inputTime float64, inputFrame, outputFrame int,
 ) {
 	f := c.r.f
 	ch := c.r.ch
 	batchNum := len(c.samples) / ch
 
 	offsetsNum := len(f.offsetWins)
-	inputFrame := int(inputTime) + (c.startSample / ch)
 	offset := (outputFrame + c.processed) % offsetsNum
 
 	// computing left wing including the middle element
