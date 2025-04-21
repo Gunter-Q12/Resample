@@ -98,7 +98,6 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	wingSize := r.f.Length(0) * r.elemSize
 	middleSize := (runtime.NumCPU()*1024 + r.inRate - 1) / r.inRate * r.inRate
 	buffSize := wingSize*3 + middleSize*r.elemSize
-	//buffHalf := buffSize / 2
 
 	buffer := make([]byte, buffSize)
 	read := 0
@@ -108,7 +107,7 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	if err != nil && err != io.EOF {
 		return int64(read), err
 	}
-	if n < middleSize+wingSize || err == io.EOF {
+	if n < middleSize+wingSize {
 		_, err = r.write(buffer[:n], 0, n)
 		return int64(read), err
 	}
@@ -118,8 +117,6 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	if err != nil {
 		return int64(read), err
 	}
-
-	// Move data to the left
 	_ = copy(buffer[:wingSize*2], buffer[middleSize-wingSize:middleSize+wingSize])
 
 	for {
@@ -128,7 +125,7 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 		if err != nil && err != io.EOF {
 			return int64(read), err
 		}
-		if n < middleSize || err == io.EOF {
+		if n < middleSize {
 			_, err = r.write(buffer[0:wingSize*2+n], wingSize, wingSize*2+n)
 			return int64(read), err
 		}
@@ -182,7 +179,7 @@ func write[T number](r *Resampler, input []byte, start, end int) (int, error) {
 	endSample := end / r.elemSize
 
 	inFrames := (endSample - startSample) / r.ch
-	outFrames := int(float64(inFrames) * float64(r.outRate) / float64(r.inRate))
+	outFrames := int(float64(inFrames*r.outRate) / float64(r.inRate))
 	outSamples := outFrames * r.ch
 
 	info := convolutionInfo[T]{
