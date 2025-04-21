@@ -126,9 +126,7 @@ func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 
 	buff := make([]byte, buffSize)
 
-	c := convolver[T]{
-		r: r,
-	}
+	c := newConvolver[T](r, buffSize)
 
 	read := 0
 
@@ -169,9 +167,7 @@ func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 }
 
 func write[T number](r *Resampler, input []byte) (int, error) {
-	c := convolver[T]{
-		r: r,
-	}
+	c := newConvolver[T](r, len(input))
 	return c.resample(input, 0, len(input))
 }
 
@@ -182,37 +178,50 @@ type convolver[T number] struct {
 
 	startSample int
 	endSample   int
-	processed   int
 	samples     []float64
 	output      []T
+	processed   int
+}
+
+func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
+	inFrames := maxInputSize / r.elemSize / r.ch
+	outFrames := int(float64(inFrames*r.outRate) / float64(r.inRate))
+	outSamples := outFrames * r.ch
+
+	c := &convolver[T]{
+		r: r,
+
+		timeIncrement: float64(r.inRate) / float64(r.outRate),
+		samples:       make([]float64, maxInputSize/r.elemSize),
+		output:        make([]T, outSamples),
+	}
+
+	c.frameFunc = c.calcFrame
+	if c.r.memoization {
+		c.frameFunc = c.calcFrameWithMemoization
+	}
+	return c
 }
 
 // resample is an actual implementation of Write.
 func (c *convolver[T]) resample(input []byte, start, end int) (int, error) {
-	samples, err := getSamples[T](input, c.r.elemSize)
+	var err error
+	err = c.parseSamples(input)
 	if err != nil {
 		return 0, fmt.Errorf("resampler: resample: %w", err)
 	}
 
-	c.frameFunc = calcFrame[T]
-	c.timeIncrement = float64(c.r.inRate) / float64(c.r.outRate)
 	c.startSample = start / c.r.elemSize
 	c.endSample = end / c.r.elemSize
-	c.samples = samples
 
 	inFrames := (c.endSample - c.startSample) / c.r.ch
 	outFrames := int(float64(inFrames*c.r.outRate) / float64(c.r.inRate))
 	outSamples := outFrames * c.r.ch
-
-	c.output = make([]T, outSamples)
-
-	if c.r.memoization {
-		c.frameFunc = calcFrameWithMemoization
-	}
+	c.output = c.output[:outSamples]
 
 	c.convolve()
 
-	err = binary.Write(c.r.outBuf, binary.LittleEndian, c.output)
+	err = binary.Write(c.r.outBuf, binary.LittleEndian, c.output[:outSamples])
 	if err != nil {
 		return 0, fmt.Errorf("resampler: resample: %w", err)
 	}
@@ -222,18 +231,18 @@ func (c *convolver[T]) resample(input []byte, start, end int) (int, error) {
 }
 
 // getSamples reads input and converts it to a slice of floats.
-func getSamples[T number](input []byte, elemSize int) ([]float64, error) {
-	samples := make([]T, len(input)/elemSize)
+func (c *convolver[T]) parseSamples(input []byte) error {
+	samples := make([]T, len(input)/c.r.elemSize)
 	err := binary.Read(bytes.NewReader(input), binary.LittleEndian, &samples)
 	if err != nil {
-		return nil, fmt.Errorf("getting samples: %w", err)
+		return fmt.Errorf("getting samples: %w", err)
 	}
 
-	fSamples := make([]float64, len(samples))
+	c.samples = c.samples[:len(samples)]
 	for i, s := range samples {
-		fSamples[i] = float64(s)
+		c.samples[i] = float64(s)
 	}
-	return fSamples, nil
+	return nil
 }
 
 func (c *convolver[T]) convolve() {
@@ -259,7 +268,7 @@ func (c *convolver[T]) convolve() {
 				outputFrame := startFrame + currFrame
 				inputTime := float64(outputFrame) * c.timeIncrement
 
-				c.frameFunc(c.r.f, c.samples, newSamples, inputTime, outputFrame, c)
+				c.frameFunc(c.r.f, c.samples, newSamples, inputTime, outputFrame)
 
 				startSample := outputFrame * c.r.ch
 				for s, sample := range newSamples {
@@ -272,9 +281,9 @@ func (c *convolver[T]) convolve() {
 	wg.Wait()
 }
 
-type frameCalcFunc[T number] func(*filter, []float64, []float64, float64, int, *convolver[T])
+type frameCalcFunc[T number] func(*filter, []float64, []float64, float64, int)
 
-func calcFrame[T number](f *filter, samples, newSamples []float64, inputTime float64, _ int, c *convolver[T]) {
+func (c *convolver[T]) calcFrame(f *filter, samples, newSamples []float64, inputTime float64, _ int) {
 	ch := len(newSamples)
 	batchNum := len(samples) / ch
 
@@ -305,8 +314,8 @@ func calcFrame[T number](f *filter, samples, newSamples []float64, inputTime flo
 	}
 }
 
-func calcFrameWithMemoization[T number](
-	f *filter, samples, newSamples []float64, inputTime float64, outputFrame int, c *convolver[T],
+func (c *convolver[T]) calcFrameWithMemoization(
+	f *filter, samples, newSamples []float64, inputTime float64, outputFrame int,
 ) {
 	ch := len(newSamples)
 	batchNum := len(samples) / ch
