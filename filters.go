@@ -63,12 +63,11 @@ func newFilter(info filterInfo, inRate, outRate int, memoization bool) *filter {
 			offsetWins[i][j] = f.Value(offset, j)
 		}
 	}
+	f.offsetWins = offsetWins
+	f.interpDelta = nil
+	f.interpDelta = nil
 
-	return &filter{
-		offsetWins: offsetWins,
-		density:    info.density,
-		scale:      scale,
-	}
+	return f
 }
 
 // Length is the number of samples that one wing of the window covers

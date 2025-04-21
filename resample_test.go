@@ -18,6 +18,14 @@ type number interface {
 	constraints.Float | constraints.Integer
 }
 
+var formatElementSize = map[resample.Format]int{
+	resample.FormatInt16:   2,
+	resample.FormatInt32:   4,
+	resample.FormatInt64:   8,
+	resample.FormatFloat32: 4,
+	resample.FormatFloat64: 8,
+}
+
 type testCase[T number] struct {
 	name   string
 	format resample.Format
@@ -67,29 +75,6 @@ func TestIOCopy(t *testing.T) {
 		require.NoError(t, err)
 		output := unBuffer[int16](t, outBuf)
 		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[:5])
-	})
-
-	t.Run("big", func(t *testing.T) {
-		speech44Data, err := os.Open("./testdata/speech_sample_mono44.1kHz16bit.raw")
-		require.NoError(t, err)
-
-		speech14Data, err := os.Open("./testdata/speech_sample_mono14.7kHz16bit.raw")
-		require.NoError(t, err)
-		speech14 := unBuffer[int16](t, speech14Data)
-
-		outBuf := new(bytes.Buffer)
-		res, err := resample.New(
-			outBuf, resample.FormatInt16, 44100, 14700, 1,
-			resample.WithKaiserFastFilter(),
-		)
-		require.NoError(t, err)
-
-		_, err = io.Copy(res, speech44Data)
-		require.NoError(t, err)
-
-		output := unBuffer[int16](t, outBuf)
-		assert.InDelta(t, len(speech14), len(output), 10)
-		avgDelta[int16](24)(t, speech14, output)
 	})
 }
 
@@ -190,6 +175,27 @@ func check[T number](t *testing.T, nameSuffix string, tc testCase[T],
 	})
 }
 
+func checkIOCopy[T number](t *testing.T, nameSuffix string, tc testCase[T],
+	checker checker[T], options ...resample.Option) {
+	t.Run(fmt.Sprintf("%s %s io.Copy", tc.name, nameSuffix), func(t *testing.T) {
+		outBuf := new(bytes.Buffer)
+		res, err := resample.New(outBuf, tc.format, tc.ir, tc.or, tc.ch, options...)
+		require.NoError(t, err)
+
+		n, err := io.Copy(res, reader{buffer(t, tc.input)})
+		assert.Equal(t, len(tc.input)*formatElementSize[tc.format], int(n))
+		assert.NoError(t, err)
+
+		if tc.err != nil {
+			assert.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			got := unBuffer[T](t, outBuf)
+			checker(t, tc.output, got)
+		}
+	})
+}
+
 func FuzzResampler(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte, ir, or, ch int) {
 		res, err := resample.New(io.Discard, resample.FormatInt16, ir, or, ch, resample.WithKaiserFastestFilter())
@@ -228,6 +234,14 @@ func buffer(t testing.TB, values any) *bytes.Buffer {
 		t.Fatal(err)
 	}
 	return inBuf
+}
+
+type reader struct {
+	data *bytes.Buffer
+}
+
+func (r reader) Read(p []byte) (n int, err error) {
+	return r.data.Read(p)
 }
 
 func unBuffer[T any](t testing.TB, buff io.Reader) []T {

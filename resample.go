@@ -47,6 +47,8 @@ type Resampler struct {
 	memoization bool
 	f           *filter
 	elemSize    int
+
+	processed int
 }
 
 // New creates a new Resampler.
@@ -86,60 +88,114 @@ func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 }
 
 func (r *Resampler) Write(input []byte) (int, error) {
+	r.processed = 0
+	return r.write(input, 0, len(input))
+}
+
+func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
+	r.processed = 0
+
+	wingSize := r.f.Length(0) * r.elemSize
+	middleSize := (runtime.NumCPU()*1024 + r.inRate - 1) / r.inRate * r.inRate
+	buffSize := wingSize*3 + middleSize*r.elemSize
+	//buffHalf := buffSize / 2
+
+	buffer := make([]byte, buffSize)
+	read := 0
+
+	n, err := reader.Read(buffer[:middleSize+wingSize])
+	read += n
+	if err != nil && err != io.EOF {
+		return int64(read), err
+	}
+	if n < middleSize+wingSize || err == io.EOF {
+		_, err = r.write(buffer[:n], 0, n)
+		return int64(read), err
+	}
+
+	// Special case for the first part
+	_, err = r.write(buffer[:middleSize], 0, middleSize)
+	if err != nil {
+		return int64(read), err
+	}
+
+	// Move data to the left
+	_ = copy(buffer[:wingSize*2], buffer[middleSize-wingSize:middleSize+wingSize])
+
+	for {
+		n, err = reader.Read(buffer[wingSize*2 : wingSize*2+middleSize])
+		read += n
+		if err != nil && err != io.EOF {
+			return int64(read), err
+		}
+		if n < middleSize || err == io.EOF {
+			_, err = r.write(buffer[0:wingSize*2+n], wingSize, wingSize*2+n)
+			return int64(read), err
+		}
+
+		_, err = r.write(buffer[0:wingSize*2+middleSize], wingSize, wingSize+middleSize)
+		if err != nil {
+			return int64(read), err
+		}
+		_ = copy(buffer[:wingSize*2], buffer[middleSize:middleSize+wingSize*2])
+	}
+}
+
+func (r *Resampler) write(input []byte, start, end int) (int, error) {
 	switch r.format {
 	case FormatInt16:
-		return write[int16](r, input)
+		return write[int16](r, input, start, end)
 	case FormatInt32:
-		return write[int32](r, input)
+		return write[int32](r, input, start, end)
 	case FormatInt64:
-		return write[int64](r, input)
+		return write[int64](r, input, start, end)
 	case FormatFloat32:
-		return write[float32](r, input)
+		return write[float32](r, input, start, end)
 	case FormatFloat64:
-		return write[float64](r, input)
+		return write[float64](r, input, start, end)
 	default:
 		panic("unknown format")
 	}
 }
 
-func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return 0, fmt.Errorf("resampler: reading from: %w", err)
-	}
-	n, err := r.Write(data)
-	return int64(n), err
-}
-
 type convolutionInfo[T number] struct {
 	f             *filter
-	frameFunc     frameCalcFunc
+	frameFunc     frameCalcFunc[T]
 	timeIncrement float64
 	ch            int
 
-	samples []float64
-	output  []T
+	startSample      int
+	endSample        int
+	processedSamples int
+	samples          []float64
+	output           []T
 }
 
 // write is an actual implementation of Write.
-func write[T number](r *Resampler, input []byte) (int, error) {
+func write[T number](r *Resampler, input []byte, start, end int) (int, error) {
 	samples, err := getSamples[T](input, r.elemSize)
 	if err != nil {
 		return 0, fmt.Errorf("resampler: write: %w", err)
 	}
 
-	inFrames := len(samples) / r.ch
+	startSample := start / r.elemSize
+	endSample := end / r.elemSize
+
+	inFrames := (endSample - startSample) / r.ch
 	outFrames := int(float64(inFrames) * float64(r.outRate) / float64(r.inRate))
 	outSamples := outFrames * r.ch
 
 	info := convolutionInfo[T]{
 		f:             r.f,
-		frameFunc:     calcFrame,
+		frameFunc:     calcFrame[T],
 		timeIncrement: float64(r.inRate) / float64(r.outRate),
 		ch:            r.ch,
 
-		samples: samples,
-		output:  make([]T, outSamples),
+		startSample:      startSample,
+		endSample:        endSample,
+		processedSamples: r.processed,
+		samples:          samples,
+		output:           make([]T, outSamples),
 	}
 	if r.memoization {
 		info.frameFunc = calcFrameWithMemoization
@@ -151,6 +207,8 @@ func write[T number](r *Resampler, input []byte) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("resampler: write: %w", err)
 	}
+
+	r.processed += outSamples
 	return len(input), nil
 }
 
@@ -192,7 +250,7 @@ func convolve[T number](info convolutionInfo[T]) {
 				outputFrame := startFrame + currFrame
 				inputTime := float64(outputFrame) * info.timeIncrement
 
-				info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame)
+				info.frameFunc(info.f, info.samples, newSamples, inputTime, outputFrame, info)
 
 				startSample := outputFrame * info.ch
 				for s, sample := range newSamples {
@@ -205,13 +263,13 @@ func convolve[T number](info convolutionInfo[T]) {
 	wg.Wait()
 }
 
-type frameCalcFunc func(*filter, []float64, []float64, float64, int)
+type frameCalcFunc[T number] func(*filter, []float64, []float64, float64, int, convolutionInfo[T])
 
-func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, _ int) {
+func calcFrame[T number](f *filter, samples, newSamples []float64, inputTime float64, _ int, info convolutionInfo[T]) {
 	ch := len(newSamples)
 	batchNum := len(samples) / ch
 
-	inputFrame := int(inputTime)
+	inputFrame := int(inputTime) - info.processedSamples + (info.startSample / info.ch)
 	offset := inputTime - float64(inputFrame)
 
 	// computing left wing including the middle element
@@ -237,13 +295,15 @@ func calcFrame(f *filter, samples, newSamples []float64, inputTime float64, _ in
 	}
 }
 
-func calcFrameWithMemoization(f *filter, samples, newSamples []float64, inputTime float64, outputFrame int) {
+func calcFrameWithMemoization[T number](
+	f *filter, samples, newSamples []float64, inputTime float64, outputFrame int, info convolutionInfo[T],
+) {
 	ch := len(newSamples)
 	batchNum := len(samples) / ch
 
 	offsetsNum := len(f.offsetWins)
-	inputFrame := int(inputTime)
-	offset := outputFrame % offsetsNum
+	inputFrame := int(inputTime) + (info.startSample / info.ch)
+	offset := (outputFrame + info.processedSamples) % offsetsNum
 
 	// computing left wing including the middle element
 	iters := min(len(f.offsetWins[offset]), inputFrame+1)
