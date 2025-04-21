@@ -268,7 +268,7 @@ func (c *convolver[T]) convolve() {
 				outputFrame := startFrame + currFrame
 				inputTime := float64(outputFrame) * c.timeIncrement
 
-				c.frameFunc(c.r.f, c.samples, newSamples, inputTime, outputFrame)
+				c.frameFunc(newSamples, inputTime, outputFrame)
 
 				startSample := outputFrame * c.r.ch
 				for s, sample := range newSamples {
@@ -281,14 +281,15 @@ func (c *convolver[T]) convolve() {
 	wg.Wait()
 }
 
-type frameCalcFunc[T number] func(*filter, []float64, []float64, float64, int)
+type frameCalcFunc[T number] func([]float64, float64, int)
 
-func (c *convolver[T]) calcFrame(f *filter, samples, newSamples []float64, inputTime float64, _ int) {
-	ch := len(newSamples)
-	batchNum := len(samples) / ch
+func (c *convolver[T]) calcFrame(newSamples []float64, inputTime float64, _ int) {
+	f := c.r.f
+	ch := c.r.ch
+	batchNum := len(c.samples) / ch
 
-	inputFrame := int(inputTime) + (c.startSample / c.r.ch)
-	offset := inputTime + float64(c.processed/c.r.ch)*c.timeIncrement
+	inputFrame := int(inputTime) + (c.startSample / ch)
+	offset := inputTime + float64(c.processed/ch)*c.timeIncrement
 	offset = offset - float64(int(offset))
 
 	// computing left wing including the middle element
@@ -297,7 +298,7 @@ func (c *convolver[T]) calcFrame(f *filter, samples, newSamples []float64, input
 		weight := f.Value(offset, i)
 		startSample := (inputFrame - i) * ch
 		for s := range newSamples {
-			newSamples[s] += weight * samples[startSample+s]
+			newSamples[s] += weight * c.samples[startSample+s]
 		}
 	}
 
@@ -309,19 +310,20 @@ func (c *convolver[T]) calcFrame(f *filter, samples, newSamples []float64, input
 		weight := f.Value(offset, i)
 		startSample := (inputFrame + i + 1) * ch
 		for s := range newSamples {
-			newSamples[s] += weight * samples[startSample+s]
+			newSamples[s] += weight * c.samples[startSample+s]
 		}
 	}
 }
 
 func (c *convolver[T]) calcFrameWithMemoization(
-	f *filter, samples, newSamples []float64, inputTime float64, outputFrame int,
+	newSamples []float64, inputTime float64, outputFrame int,
 ) {
-	ch := len(newSamples)
-	batchNum := len(samples) / ch
+	f := c.r.f
+	ch := c.r.ch
+	batchNum := len(c.samples) / ch
 
 	offsetsNum := len(f.offsetWins)
-	inputFrame := int(inputTime) + (c.startSample / c.r.ch)
+	inputFrame := int(inputTime) + (c.startSample / ch)
 	offset := (outputFrame + c.processed) % offsetsNum
 
 	// computing left wing including the middle element
@@ -329,7 +331,7 @@ func (c *convolver[T]) calcFrameWithMemoization(
 	for i, weight := range f.offsetWins[offset][:iters] {
 		startSample := (inputFrame - i) * ch
 		for s := range newSamples {
-			newSamples[s] += weight * samples[startSample+s]
+			newSamples[s] += weight * c.samples[startSample+s]
 		}
 	}
 
@@ -345,7 +347,7 @@ func (c *convolver[T]) calcFrameWithMemoization(
 	for i, weight := range f.offsetWins[offset][start:iters] {
 		startSample := (inputFrame + i + 1) * ch
 		for s := range newSamples {
-			newSamples[s] += weight * samples[startSample+s]
+			newSamples[s] += weight * c.samples[startSample+s]
 		}
 	}
 }
