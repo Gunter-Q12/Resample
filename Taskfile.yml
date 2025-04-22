@@ -1,0 +1,20 @@
+version: '3'
+
+tasks:
+  bench:
+    requires:
+      vars: [NAME]
+    cmds:
+      - >
+        go test -bench Write -skip Test -count=10
+        -benchmem -memprofile ./results/{{.NAME}}_mem.out
+        -cpuprofile ./results/{{.NAME}}_cpu.out > ./results/{{.NAME}}.txt
+
+  up_1ch:
+    requires:
+      vars: [NAME]
+    cmds:
+      - >
+        go run ./cmd/resampler/
+        -format f64 -ir 16000 -or 44000 -ch 2
+        ./testdata/piano-16k-16-2.wav /dev/null
