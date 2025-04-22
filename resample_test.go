@@ -76,6 +76,23 @@ func TestIOCopy(t *testing.T) {
 		output := unBuffer[int16](t, outBuf)
 		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[:5])
 	})
+	t.Run("run twice", func(t *testing.T) {
+		outBuf := new(bytes.Buffer)
+		res, err := resample.New(outBuf, resample.FormatInt16, 1, 2, 1, resample.WithLinearFilter())
+		require.NoError(t, err)
+
+		inBuf := buffer(t, []int16{1, 3, 5})
+		_, err = io.Copy(res, inBuf)
+
+		inBuf = buffer(t, []int16{1, 3, 5})
+		_, err = io.Copy(res, inBuf)
+
+		require.NoError(t, err)
+		output := unBuffer[int16](t, outBuf)
+		t.Log(output)
+		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[:5])
+		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[6:11])
+	})
 }
 
 func TestResamplerFloat(t *testing.T) {
