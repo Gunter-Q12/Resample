@@ -83,11 +83,12 @@ func TestIOCopy(t *testing.T) {
 
 		inBuf := buffer(t, []int16{1, 3, 5})
 		_, err = io.Copy(res, inBuf)
+		require.NoError(t, err)
 
 		inBuf = buffer(t, []int16{1, 3, 5})
 		_, err = io.Copy(res, inBuf)
-
 		require.NoError(t, err)
+
 		output := unBuffer[int16](t, outBuf)
 		t.Log(output)
 		assert.Equal(t, []int16{1, 2, 3, 4, 5}, output[:5])
@@ -201,7 +202,7 @@ func checkIOCopy[T number](t *testing.T, nameSuffix string, tc testCase[T],
 
 		n, err := io.Copy(res, reader{buffer(t, tc.input)})
 		assert.Equal(t, len(tc.input)*formatElementSize[tc.format], int(n))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		if tc.err != nil {
 			assert.Error(t, err)
@@ -242,7 +243,7 @@ func BenchmarkWrite(b *testing.B) {
 	b.ResetTimer()
 	for range b.N {
 		_, err := io.Copy(r, bytes.NewReader(input))
-		//_, err := r.Write(samples)
+		// _, err := r.Write(samples)
 		require.NoError(b, err)
 	}
 }

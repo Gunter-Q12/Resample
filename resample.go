@@ -115,10 +115,15 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	}
 }
 
+func write[T number](r *Resampler, input []byte) (int, error) {
+	c := newConvolver[T](r, len(input))
+	return c.resample(input, 0, len(input))
+}
+
 func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 	wingSize := r.f.Length(0) * r.elemSize
 	middleSize := (runtime.NumCPU()*1024 + r.inRate - 1) / r.inRate * r.inRate
-	buffSize := wingSize*3 + middleSize*r.elemSize
+	buffSize := wingSize*3 + middleSize*r.elemSize //nolint:mnd // math
 
 	buff := make([]byte, buffSize)
 
@@ -128,7 +133,7 @@ func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 
 	n, err := reader.Read(buff[:middleSize+wingSize])
 	read += n
-	if err != nil && err != io.EOF {
+	if err != nil && errors.Is(err, io.EOF) {
 		return int64(read), err
 	}
 	if n < middleSize+wingSize {
@@ -146,7 +151,7 @@ func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 	for {
 		n, err = reader.Read(buff[wingSize*2 : wingSize*2+middleSize])
 		read += n
-		if err != nil && err != io.EOF {
+		if err != nil && errors.Is(err, io.EOF) {
 			return int64(read), err
 		}
 		if n < middleSize {
@@ -160,9 +165,4 @@ func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 		}
 		_ = copy(buff[:wingSize*2], buff[middleSize:middleSize+wingSize*2])
 	}
-}
-
-func write[T number](r *Resampler, input []byte) (int, error) {
-	c := newConvolver[T](r, len(input))
-	return c.resample(input, 0, len(input))
 }
