@@ -177,9 +177,10 @@ type convolver[T number] struct {
 	timeIncrement float64
 	processed     int
 
-	convBuffer []float64
-	samples    []float64
-	output     []T
+	convBuffer  []float64
+	parseBuffer []T
+	samples     []float64
+	output      []T
 }
 
 func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
@@ -191,9 +192,10 @@ func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
 		r:             r,
 		timeIncrement: float64(r.inRate) / float64(r.outRate),
 
-		convBuffer: make([]float64, runtime.NumCPU()*routinesPerCore*r.ch),
-		samples:    make([]float64, maxInputSize/r.elemSize),
-		output:     make([]T, outSamples),
+		convBuffer:  make([]float64, runtime.NumCPU()*routinesPerCore*r.ch),
+		parseBuffer: make([]T, maxInputSize/r.elemSize),
+		samples:     make([]float64, maxInputSize/r.elemSize),
+		output:      make([]T, outSamples),
 	}
 
 	c.frameFunc = c.calcFrame
@@ -232,7 +234,7 @@ func (c *convolver[T]) resample(input []byte, start, end int) (int, error) {
 
 // getSamples reads input and converts it to a slice of floats.
 func (c *convolver[T]) parseSamples(input []byte) error {
-	samples := make([]T, len(input)/c.r.elemSize)
+	samples := c.parseBuffer[:len(input)/c.r.elemSize]
 	err := binary.Read(bytes.NewReader(input), binary.LittleEndian, &samples)
 	if err != nil {
 		return fmt.Errorf("getting samples: %w", err)
