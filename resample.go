@@ -139,9 +139,7 @@ func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 	buffSize := wingSize*3 + middleSize*r.elemSize //nolint:mnd // math
 
 	buff := make([]byte, buffSize)
-
 	c := newConvolver[T](r, buffSize)
-
 	read := 0
 
 	n, err := reader.Read(buff[:middleSize+wingSize])
