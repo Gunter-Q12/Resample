@@ -191,7 +191,7 @@ func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
 		r:             r,
 		timeIncrement: float64(r.inRate) / float64(r.outRate),
 
-		convBuffer: make([]float64, runtime.NumCPU()*routinesPerCore),
+		convBuffer: make([]float64, runtime.NumCPU()*routinesPerCore*r.ch),
 		samples:    make([]float64, maxInputSize/r.elemSize),
 		output:     make([]T, outSamples),
 	}
