@@ -33,7 +33,7 @@ var formatElementSize = map[Format]int{
 	FormatFloat64: 8,
 }
 
-// A Resampler is an object that writes resampled data into an io.Writer.
+// A Resampler is a struct used for resampling.
 type Resampler struct {
 	outBuf      io.Writer
 	format      Format
@@ -47,7 +47,11 @@ type Resampler struct {
 
 // New creates a new Resampler.
 //
-// Default filter is kaiser fast filter, use WithXFilter options to change it.
+// Calling Resampler.Write and Resampler.ReadFrom methods on the returned Resampler
+// will resample data according to provided format, inRate, outRate and number of channels.
+// Results are written to the io.Writer.
+//
+// Default filter is KaiserFastFilter, use WithXFilter options to change it.
 // Memoization is enabled by default, use WithNoMemoization function to disable it.
 func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	options ...Option) (*Resampler, error) {
@@ -81,6 +85,12 @@ func New(outBuffer io.Writer, format Format, inRate, outRate, ch int,
 	return resampler, nil
 }
 
+// Write writes resampled data to an io.Writer provided during a New call.
+//
+// If Write is called multiple times, the data is appended to the same io.Writer.
+// Note that calling Write on separate parts of the same file may result in
+// imperfect resampling at the boundaries. For large files that do not fit
+// into memory, use io.Copy instead.
 func (r *Resampler) Write(input []byte) (int, error) {
 	switch r.format {
 	case FormatInt16:
@@ -98,6 +108,7 @@ func (r *Resampler) Write(input []byte) (int, error) {
 	}
 }
 
+// ReadFrom reads all the data from reader using batching to reduce memory usage.
 func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	switch r.format {
 	case FormatInt16:
@@ -115,11 +126,13 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	}
 }
 
+// write is an actual implementation of Resampler.Write
 func write[T number](r *Resampler, input []byte) (int, error) {
 	c := newConvolver[T](r, len(input))
 	return c.resample(input, 0, len(input))
 }
 
+// readFrom is an actual implementation of Resampler.ReadFrom
 func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 	wingSize := r.f.Length(0) * r.elemSize
 	middleSize := (runtime.NumCPU()*1024 + r.inRate - 1) / r.inRate * r.inRate

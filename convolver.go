@@ -8,6 +8,11 @@ import (
 	"sync"
 )
 
+// convolver is a struct created before convolution and
+// contains all the information necessary for it.
+//
+// The main purpose of this struct is to avoid memory allocations
+// on each convolve call.
 type convolver[T number] struct {
 	r             *Resampler
 	frameFunc     frameCalcFunc[T]
@@ -20,6 +25,8 @@ type convolver[T number] struct {
 	output      []T
 }
 
+// newConvolver returns a new convolver given a resampler and
+// maximal possible input size in bytes.
 func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
 	inFrames := maxInputSize / r.elemSize / r.ch
 	outFrames := int(float64(inFrames*r.outRate) / float64(r.inRate))
@@ -42,7 +49,7 @@ func newConvolver[T number](r *Resampler, maxInputSize int) *convolver[T] {
 	return c
 }
 
-// resample is an actual implementation of Write.
+// resample resamples part of a given input from a start to an end byte.
 func (c *convolver[T]) resample(input []byte, start, end int) (int, error) {
 	var err error
 	err = c.parseSamples(input)
@@ -69,7 +76,7 @@ func (c *convolver[T]) resample(input []byte, start, end int) (int, error) {
 	return len(input), nil
 }
 
-// getSamples reads input and converts it to a slice of floats.
+// parseSamples parses input and loads it into samples field.
 func (c *convolver[T]) parseSamples(input []byte) error {
 	samples := c.parseBuffer[:len(input)/c.r.elemSize]
 	err := binary.Read(bytes.NewReader(input), binary.LittleEndian, &samples)
@@ -84,6 +91,7 @@ func (c *convolver[T]) parseSamples(input []byte) error {
 	return nil
 }
 
+// convolve performs convolution between samples and a filter window.
 func (c *convolver[T]) convolve(startSample int) {
 	ch := c.r.ch
 	routines := runtime.NumCPU() * routinesPerCore
@@ -122,6 +130,8 @@ func (c *convolver[T]) convolve(startSample int) {
 
 type frameCalcFunc[T number] func([]float64, float64, int, int)
 
+// calcFrame calculates a single output frame and writes it to
+// newSamples. Does not use precomputed window offsets.
 func (c *convolver[T]) calcFrame(
 	newSamples []float64, inputTime float64, inputFrame, _ int,
 ) {
@@ -155,6 +165,8 @@ func (c *convolver[T]) calcFrame(
 	}
 }
 
+// calcFrameWithMemoization calculates a single output frame
+// and writes it to newSamples. Uses precomputed window offsets.
 func (c *convolver[T]) calcFrameWithMemoization(
 	newSamples []float64, _ float64, inputFrame, outputFrame int,
 ) {

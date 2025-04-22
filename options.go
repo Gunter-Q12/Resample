@@ -5,7 +5,7 @@ const (
 	memoizationPrecedence = 100
 )
 
-// Option is a struct used to configure [Resampler].
+// Option is a struct used to configure Resampler.
 type Option struct {
 	precedence int
 	apply      func(*Resampler) error
@@ -22,7 +22,7 @@ func optionCmp(a, b Option) int {
 // sampling rages with a small greatest common divisor (e.g. 9999 and 10000).
 //
 // Enabling this function slows the resampling progress significantly.
-// Therefore, Most users should avoid it and should switch used filter instead.
+// Therefore, most users should avoid it and switch used filter instead.
 func WithNoMemoization() Option {
 	return Option{
 		precedence: memoizationPrecedence,
@@ -78,25 +78,29 @@ func WithLinearFilter() Option {
 }
 
 // WithKaiserFastestFilter function returns option
-// that configures [Resampler] to use the fast Kaiser filter.
+// that configures [Resampler] to use KaiserFastestFilter.
 //
-// Fastest Kaiser filter provides higher resampling speed in exchange for lower quality.
+// Compared to default (Kaiser Fast) filter,
+// KaiserFastestFilter provides higher resampling speed and lower memory usage
+// in exchange for lower quality.
 func WithKaiserFastestFilter() Option {
 	return withFilter(kaiserFastestInfo)
 }
 
 // WithKaiserFastFilter function returns option
-// that configures [Resampler] to use the best Kaiser filter.
+// that configures [Resampler] to use KaiserFastFilter.
 //
-// Best Kaiser filter provides higher resampling speed in exchange for lower quality.
+// Used by default.
 func WithKaiserFastFilter() Option {
 	return withFilter(kaiserFastInfo)
 }
 
 // WithKaiserBestFilter function returns option
-// that configures [Resampler] to use the fastest Kaiser filter.
+// that configures [Resampler] to use KaiserBestFilter.
 //
-// Used by default.
+// Compared to default (Kaiser Fast) filter,
+// KaiserBestFilter provides higher resampling quality
+// in exchange for lower speed and higher memory usage.
 func WithKaiserBestFilter() Option {
 	return withFilter(kaiserBestInfo)
 }
