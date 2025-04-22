@@ -237,9 +237,12 @@ func BenchmarkWrite(b *testing.B) {
 	samples, err := io.ReadAll(file)
 	require.NoError(b, err)
 
+	input := buffer(b, samples).Bytes()
+
 	b.ResetTimer()
 	for range b.N {
-		_, err := r.Write(samples)
+		_, err := io.Copy(r, bytes.NewReader(input))
+		//_, err := r.Write(samples)
 		require.NoError(b, err)
 	}
 }
