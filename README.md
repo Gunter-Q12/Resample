@@ -11,11 +11,12 @@ Implementation is based on [bandlimited interpolation](https://ccrma.stanford.ed
 
 - io.Copy support (uses little RAM, even for GB-sized files)
 - concurrency
-- speed
-- tested accuracy
+- [speed](#performance)
+- [tested precision](#precision)
 - no C dependencies
 
 ## Example
+
 See the [API documentation on go.dev](https://pkg.go.dev/github.com/gunter-q12/resample).
 
 ```go
@@ -37,13 +38,46 @@ func main() {
 ```
 
 ## Benchmarks
-### Precision
-Precision test were performed againstx
-a well-known [SOXR](https://github.com/chirlu/soxr) library
-using a Go wrapper by [zaf](https://github.com/zaf/resample).
 
-**TODO**
+### Precision
+
+Precision test were performed against
+a [resapmpy](https://resampy.readthedocs.io/en/stable/) library
+that implements the same exact resampling method.
+Results were used to create [precision unit tests](precision_test.go)
+and ensure that implementation is correct.
 
 ### Performance
 
-**TODO**
+Each table row has a different number of entries because libraries
+provide a different number of quality settings.
+Results are sorted from the lowest quality to the highest.
+
+
+Downsampling 44100 -> 16000 Hz, 10 Mb file, in seconds
+
+| Library                                                |      |      |      |      |      |
+|--------------------------------------------------------|------|------|------|------|------|
+| [zaf/resample (SOXR)](https://github.com/zaf/resample) | 0.12 | 0.13 | 0.14 | 0.14 | 0.16 |
+| **Resample**                                           | 0.27 | 0.31 | 0.38 |      |      |
+| [resampy](https://resampy.readthedocs.io/en/stable/)   | 1.12 | 1.4  |      |      |      |
+| [gomplerate](https://github.com/zeozeozeo/gomplerate)  | 0.47 |      |      |      |      |
+
+Upsampling 44100 -> 16000 Hz, 10 Mb file, in seconds
+
+| Library                                                |      |      |      |      |      |
+|--------------------------------------------------------|------|------|------|------|------|
+| [zaf/resample (SOXR)](https://github.com/zaf/resample) | 0.32 | 0.37 | 0.38 | 0.36 | 0.43 |
+| **Resample**                                           | 0.47 | 0.7  | 1.2  |      |      |
+| [resampy](https://resampy.readthedocs.io/en/stable/)   | 1.43 | 2.67 |      |      |      |
+| [gomplerate](https://github.com/zeozeozeo/gomplerate)  | 1.66 |      |      |      |      |
+
+
+Settings used:
+
+| Library                                                |               |             |            |       |           |
+|--------------------------------------------------------|---------------|-------------|------------|-------|-----------|
+| [zaf/resample (SOXR)](https://github.com/zaf/resample) | Quick         | LowQ        | MediumQ    | HighQ | VeryHighQ |
+| **Resample**                                           | KaiserFastest | KaiserFast  | KaiserBest |       |           |
+| [resampy](https://resampy.readthedocs.io/en/stable/)   | kaiser_fast   | kaiser_best |            |       |           |
+| [gomplerate](https://github.com/zeozeozeo/gomplerate)  | Default       |             |            |       |           |
