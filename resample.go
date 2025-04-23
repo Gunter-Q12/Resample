@@ -126,13 +126,13 @@ func (r *Resampler) ReadFrom(reader io.Reader) (int64, error) {
 	}
 }
 
-// write is an actual implementation of Resampler.Write
+// write is an actual implementation of Resampler.Write.
 func write[T number](r *Resampler, input []byte) (int, error) {
 	c := newConvolver[T](r, len(input))
 	return c.resample(input, 0, len(input))
 }
 
-// readFrom is an actual implementation of Resampler.ReadFrom
+// readFrom is an actual implementation of Resampler.ReadFrom.
 func readFrom[T number](r *Resampler, reader io.Reader) (int64, error) {
 	wingSize := r.f.Length(0) * r.elemSize
 	middleSize := (runtime.NumCPU()*1024 + r.inRate - 1) / r.inRate * r.inRate
