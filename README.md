@@ -42,7 +42,7 @@ func main() {
 ### Precision
 
 Precision test were performed against
-a [resapmpy](https://resampy.readthedocs.io/en/stable/) library
+a [resampy](https://resampy.readthedocs.io/en/stable/) library
 that implements the same exact resampling method.
 Results were used to create [precision unit tests](precision_test.go)
 and ensure that implementation is correct.
@@ -63,7 +63,7 @@ Downsampling 44100 -> 16000 Hz, 10 Mb file, in seconds
 | [resampy](https://resampy.readthedocs.io/en/stable/)   | 1.12 | 1.4  |      |      |      |
 | [gomplerate](https://github.com/zeozeozeo/gomplerate)  | 0.47 |      |      |      |      |
 
-Upsampling 44100 -> 16000 Hz, 10 Mb file, in seconds
+Upsampling 44100 <- 16000 Hz, 10 Mb file, in seconds
 
 | Library                                                |      |      |      |      |      |
 |--------------------------------------------------------|------|------|------|------|------|
